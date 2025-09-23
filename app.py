@@ -1,46 +1,152 @@
 import os
+import threading
+import time
 from flask import Flask, jsonify, request, render_template_string, send_from_directory
 from flask_cors import CORS
 # ... rest of your imports ...
 
 app = Flask(__name__)
-# Update CORS for production
-CORS(app, origins=["https://your-site.pages.dev", "http://localhost:*"])
+
+# Enhanced CORS configuration for both development and production
+cors_config = {
+    "origins": [
+        "http://localhost:*",
+        "http://127.0.0.1:*",
+        "https://*.pages.dev",  # For Cloudflare Pages
+        "https://*.netlify.app",  # If using Netlify
+        "https://*.vercel.app",   # If using Vercel
+        "https://*.onrender.com", # For Render deployments
+        "file://",  # For local file access
+        # Add your specific production URLs here
+        "https://your-site.pages.dev",  # Replace with your actual URL
+    ],
+    "methods": ["GET", "POST", "OPTIONS"],
+    "allow_headers": [
+        "Content-Type",
+        "Authorization",
+        "Access-Control-Allow-Credentials",
+        "Access-Control-Allow-Origin",
+        "Accept"
+    ],
+    "supports_credentials": True,
+    "max_age": 3600
+}
+
+# Apply CORS with specific configuration
+CORS(app, resources={
+    r"/api/*": cors_config,
+    r"/": cors_config,
+    r"/live": cors_config,
+    r"/test.html": cors_config
+})
+
+# Add after_request handler for additional CORS headers
+@app.after_request
+def after_request(response):
+    origin = request.headers.get('Origin')
+    
+    # List of allowed origins
+    allowed_origins = [
+        'http://localhost:3000',
+        'http://localhost:5000',
+        'http://localhost:8080',
+        'http://127.0.0.1:5000',
+        'https://your-site.pages.dev',  # Replace with your actual frontend URL
+        # Add more production URLs as needed
+    ]
+    
+    # If origin is in allowed list or in development
+    if origin in allowed_origins or (app.debug and origin and origin.startswith('http://localhost')):
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Accept'
+    
+    # For preflight requests
+    if request.method == 'OPTIONS':
+        response.headers['Access-Control-Max-Age'] = '3600'
+        response.status_code = 200
+    
+    return response
+
+# Add specific OPTIONS handlers for preflight requests
+@app.route('/api/current-score', methods=['OPTIONS'])
+@app.route('/api/scrape', methods=['OPTIONS'])
+@app.route('/api/status', methods=['OPTIONS'])
+@app.route('/api/set-url', methods=['OPTIONS'])
+@app.route('/api/debug', methods=['OPTIONS'])
+@app.route('/api/toggle-auto-update', methods=['OPTIONS'])
+def handle_preflight():
+    return jsonify({'status': 'ok'}), 200
 
 # ... rest of your existing code remains the same ...
 
+# Global variables
+CURRENT_MATCH_URL = None
+MATCH_DATA = {}
+AUTO_UPDATE = True
+UPDATE_INTERVAL = 30
+
+# ... all your existing classes and routes ...
+
 # At the very bottom, modify the if __name__ == '__main__': block
 if __name__ == '__main__':
-    # For local development
-    if os.environ.get('RENDER') != 'true':
+    # Check if running on Render or other production environment
+    is_production = os.environ.get('RENDER') == 'true' or os.environ.get('PRODUCTION') == 'true'
+    
+    if not is_production:
+        # For local development
         try:
             # Start background update thread
             update_thread = threading.Thread(target=auto_update_scores, daemon=True)
             update_thread.start()
             
-            # Get user input
+            # Get user input for local development
             get_user_input()
             
-            # Run Flask app
-            app.run(debug=False, host='0.0.0.0', port=5000, use_reloader=False)
+            # Run Flask app with development settings
+            app.run(
+                debug=False, 
+                host='0.0.0.0', 
+                port=5000, 
+                use_reloader=False  # Disable reloader to prevent double thread starts
+            )
             
         except KeyboardInterrupt:
             print(f"\n\n{Colors.CYAN}Server stopped. Goodbye! 👋{Colors.ENDC}")
             sys.exit(0)
     else:
-        # For production on Render
+        # For production on Render or other platforms
+        print(f"{Colors.GREEN}Starting in production mode...{Colors.ENDC}")
+        
         # Start background update thread
         update_thread = threading.Thread(target=auto_update_scores, daemon=True)
         update_thread.start()
         
-        # Set default URL if needed
-        if not CURRENT_MATCH_URL:
-            CURRENT_MATCH_URL = os.environ.get('DEFAULT_MATCH_URL', '')
+        # Set default URL from environment variable if available
+        default_url = os.environ.get('DEFAULT_MATCH_URL', '')
+        if default_url and not CURRENT_MATCH_URL:
+            CURRENT_MATCH_URL = default_url
+            print(f"{Colors.CYAN}Using default match URL from environment{Colors.ENDC}")
+            
+            # Do initial scrape
+            data = scraper.scrape_crex_scores(CURRENT_MATCH_URL)
+            if data:
+                MATCH_DATA = data
+                print(f"{Colors.GREEN}Initial data loaded successfully{Colors.ENDC}")
         
+        # Get port from environment
         port = int(os.environ.get('PORT', 5000))
-        app.run(host='0.0.0.0', port=port)
-
-from flask import Flask, jsonify, request, render_template_string, send_from_directory
+        
+        # Run app without reloader in production
+        # Note: In production, the platform (Render) handles process management
+        app.run(
+            host='0.0.0.0', 
+            port=port,
+            debug=False,
+            use_reloader=False  # Never use reloader in production
+        )
+        from flask import Flask, jsonify, request, render_template_string, send_from_directory
 from flask_cors import CORS
 import requests
 from bs4 import BeautifulSoup
@@ -52,7 +158,73 @@ import os
 import sys
 
 app = Flask(__name__)
-CORS(app)
+# Enhanced CORS configuration
+cors_config = {
+    "origins": [
+        "http://localhost:*",
+        "http://127.0.0.1:*",
+        "https://live-cricket-k3it.onrender.com",
+        "https://*.onrender.com",
+        "https://*.vercel.app",
+        "https://*.netlify.app",
+        "file://",
+    ],
+    "methods": ["GET", "POST", "OPTIONS"],
+    "allow_headers": [
+        "Content-Type",
+        "Authorization",
+        "Access-Control-Allow-Credentials",
+        "Access-Control-Allow-Origin",
+        "Accept"
+    ],
+    "supports_credentials": True,
+    "max_age": 3600
+}
+
+# Apply CORS with specific configuration
+CORS(app, resources={
+    r"/api/*": cors_config,
+    r"/": cors_config,
+    r"/live": cors_config,
+    r"/test.html": cors_config
+})
+# Add after_request handler for additional CORS headers
+@app.after_request
+def after_request(response):
+    origin = request.headers.get('Origin')
+    
+    # List of allowed origins
+    allowed_origins = [
+        'http://localhost:3000',
+        'http://localhost:5000',
+        'http://localhost:8080',
+        'http://127.0.0.1:5000',
+        'https://live-cricket-k3it.onrender.com',
+    ]
+    
+    # If origin is in allowed list or in development
+    if origin in allowed_origins or (app.debug and origin and origin.startswith('http://localhost')):
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Accept'
+    
+    # For preflight requests
+    if request.method == 'OPTIONS':
+        response.headers['Access-Control-Max-Age'] = '3600'
+        response.status_code = 200
+    
+    return response
+
+# Add specific OPTIONS handlers for preflight requests
+@app.route('/api/current-score', methods=['OPTIONS'])
+@app.route('/api/scrape', methods=['OPTIONS'])
+@app.route('/api/status', methods=['OPTIONS'])
+@app.route('/api/set-url', methods=['OPTIONS'])
+@app.route('/api/debug', methods=['OPTIONS'])
+@app.route('/api/toggle-auto-update', methods=['OPTIONS'])
+def handle_preflight():
+    return jsonify({'status': 'ok'}), 200
 
 # Global variables
 CURRENT_MATCH_URL = None
@@ -678,21 +850,28 @@ def set_url():
 def get_current_score():
     global CURRENT_MATCH_URL, MATCH_DATA
     
+    response_headers = {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+    }
+    
     if not CURRENT_MATCH_URL:
-        return jsonify({"error": "No match URL set. Please visit the home page to set a URL."}), 400
+        return jsonify({"error": "No match URL set. Please visit the home page to set a URL."}), 400, response_headers
     
     # Check if MATCH_DATA has actual data (not just empty dict)
     if MATCH_DATA and any(MATCH_DATA.values()):
-        return jsonify(MATCH_DATA), 200
+        return jsonify(MATCH_DATA), 200, response_headers
     else:
         # If no data yet, trigger a scrape
         print(f"{Colors.CYAN}No data available, triggering scrape...{Colors.ENDC}")
         data = scraper.scrape_crex_scores(CURRENT_MATCH_URL)
         if data:
             MATCH_DATA = data
-            return jsonify(MATCH_DATA), 200
+            return jsonify(MATCH_DATA), 200, response_headers
         else:
-            return jsonify({"error": "No data available yet. Please wait for the first update."}), 503
+            return jsonify({"error": "No data available yet. Please wait for the first update."}), 503, response_headers
 
 @app.route('/api/scrape')
 def scrape_match():
@@ -996,8 +1175,16 @@ if __name__ == '__main__':
         # Get user input
         get_user_input()
         
-        # Run Flask app
-        app.run(debug=False, host='0.0.0.0', port=5000, use_reloader=False)
+        # Run Flask app with proper host configuration
+        port = int(os.environ.get('PORT', 5000))
+        host = os.environ.get('HOST', '0.0.0.0')
+        
+        app.run(
+            debug=False, 
+            host=host,
+            port=port, 
+            use_reloader=False
+        )
         
     except KeyboardInterrupt:
         print(f"\n\n{Colors.CYAN}Server stopped. Goodbye! 👋{Colors.ENDC}")
