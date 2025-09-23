@@ -18,7 +18,7 @@ cors_config = {
         "https://*.onrender.com", # For Render deployments
         "file://",  # For local file access
         # Add your specific production URLs here
-        "https://your-site.pages.dev",  # Replace with your actual URL
+        "https://gajju-trial1.pages.dev/",  # Replace with your actual URL
     ],
     "methods": ["GET", "POST", "OPTIONS"],
     "allow_headers": [
@@ -1189,3 +1189,4 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print(f"\n\n{Colors.CYAN}Server stopped. Goodbye! 👋{Colors.ENDC}")
         sys.exit(0)
+
