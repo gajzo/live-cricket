@@ -988,39 +988,17 @@ def print_server_info():
     print(f"{Colors.GREEN}{'='*60}{Colors.ENDC}\n")
 
 if __name__ == '__main__':
-    import os
-    
-    # Check if running on Render
-    if 'RENDER' in os.environ:
-        # Production mode
+    try:
         # Start background update thread
         update_thread = threading.Thread(target=auto_update_scores, daemon=True)
         update_thread.start()
         
-        # Optional: Set a default URL from environment variable
-        default_url = os.environ.get('DEFAULT_MATCH_URL')
-        if default_url and not CURRENT_MATCH_URL:
-            CURRENT_MATCH_URL = default_url
-            data = scraper.scrape_crex_scores(default_url)
-            if data:
-                MATCH_DATA = data
+        # Get user input
+        get_user_input()
         
-        # Run the app
-        port = int(os.environ.get('PORT', 5000))
-        app.run(host='0.0.0.0', port=port, debug=False)
-    else:
-        # Local development mode (your existing code)
-        try:
-            # Start background update thread
-            update_thread = threading.Thread(target=auto_update_scores, daemon=True)
-            update_thread.start()
-            
-            # Get user input
-            get_user_input()
-            
-            # Run Flask app
-            app.run(debug=False, host='0.0.0.0', port=5000, use_reloader=False)
-            
-        except KeyboardInterrupt:
-            print(f"\n\n{Colors.CYAN}Server stopped. Goodbye! 👋{Colors.ENDC}")
-            sys.exit(0)
+        # Run Flask app
+        app.run(debug=False, host='0.0.0.0', port=5000, use_reloader=False)
+        
+    except KeyboardInterrupt:
+        print(f"\n\n{Colors.CYAN}Server stopped. Goodbye! 👋{Colors.ENDC}")
+        sys.exit(0)
