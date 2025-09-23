@@ -951,14 +951,18 @@
 
         // Cricket Score API Class
         class CricketScoreAPI {
-            constructor() {
-                this.backendUrl = config.backendUrl;
-                this.updateInterval = null;
-            }
+    constructor() {
+        this.backendUrl = config.backendUrl;
+        this.updateInterval = null;
+        console.log('[CricketAPI] Initialized with backend:', this.backendUrl);
+    }
 
-            async fetchCurrentScore() {
-                try {
-                    const response = await fetch(`${this.backendUrl}/api/current-score`);
+    async fetchCurrentScore() {
+        const apiUrl = `${this.backendUrl}/api/current-score`;
+        console.log('[CricketAPI] Fetching from:', apiUrl);
+        
+        try {
+            const response = await fetch(apiUrl);
                     const data = await response.json();
                     
                     if (response.ok) {
@@ -1058,14 +1062,22 @@
             }
 
             startLiveUpdates() {
-                // Initial fetch
-                this.fetchCurrentScore();
-                
-                // Update every 10 seconds
-                this.updateInterval = setInterval(() => {
-                    this.fetchCurrentScore();
-                }, 10000);
-            }
+    console.log('[CricketAPI] Starting live updates (10s interval)');
+    
+    // Initial fetch
+    this.fetchCurrentScore();
+    
+    // Clear any existing interval
+    if (this.updateInterval) {
+        clearInterval(this.updateInterval);
+    }
+    
+    // Update every 10 seconds
+    this.updateInterval = setInterval(() => {
+        console.log('[CricketAPI] Auto-refresh triggered');
+        this.fetchCurrentScore();
+    }, 10000);
+}
 
             stopUpdates() {
                 if (this.updateInterval) {
@@ -1153,20 +1165,23 @@
         }
 
         // Close popup function
-        function closePopup() {
-            const popup = document.getElementById('welcomePopup');
-            popup.style.animation = 'fadeOut 0.5s ease';
-            setTimeout(() => {
-                popup.style.display = 'none';
-            }, 500);
-            
-            // Initialize player
-            initPlayer(config.streamUrls[currentLanguage]);
-            
-            // Start fetching cricket scores from Python backend
-            cricketScoreAPI = new CricketScoreAPI();
-            cricketScoreAPI.startLiveUpdates();
-        }
+        // Close popup function
+function closePopup() {
+    const popup = document.getElementById('welcomePopup');
+    popup.style.animation = 'fadeOut 0.5s ease';
+    setTimeout(() => {
+        popup.style.display = 'none';
+    }, 500);
+    
+    // Initialize player
+    initPlayer(config.streamUrls[currentLanguage]);
+    
+    // Only start cricket API if not already started
+    if (!cricketScoreAPI) {
+        cricketScoreAPI = new CricketScoreAPI();
+        cricketScoreAPI.startLiveUpdates();
+    }
+}
 
         // Change language function
         function changeLanguage(language, button) {
@@ -1516,19 +1531,22 @@
         setInterval(createFloatingOrb, 4000);
 
         // Handle visibility change to pause/resume updates
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                // Pause updates when page is not visible
-                if (cricketScoreAPI) {
-                    cricketScoreAPI.stopUpdates();
-                }
-            } else {
-                // Resume updates when page becomes visible
-                if (cricketScoreAPI) {
-                    cricketScoreAPI.startLiveUpdates();
-                }
-            }
-        });
+        // Handle visibility change to pause/resume updates
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        console.log('[CricketAPI] Page hidden, pausing updates');
+        if (cricketScoreAPI) {
+            cricketScoreAPI.stopUpdates();
+        }
+    } else {
+        console.log('[CricketAPI] Page visible, resuming updates');
+        if (cricketScoreAPI) {
+            // Fetch immediately when page becomes visible
+            cricketScoreAPI.fetchCurrentScore();
+            cricketScoreAPI.startLiveUpdates();
+        }
+    }
+});
 
         // Error boundary for graceful error handling
         window.addEventListener('error', (event) => {
@@ -1585,7 +1603,7 @@
                 }
             }
         `;
-        document.head.appendChild(floatStyle);
+                document.head.appendChild(floatStyle);
 
         // Prevent right-click on YouTube iframe to hide context menu
         document.addEventListener('contextmenu', function(e) {
@@ -1594,7 +1612,15 @@
                 return false;
             }
         });
+
+        // Start cricket score updates immediately when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            // Don't wait for popup to close
+            cricketScoreAPI = new CricketScoreAPI();
+            cricketScoreAPI.startLiveUpdates();
+            
+            console.log('Cricket score auto-update started immediately');
+        });
     </script>
 </body>
 </html>
-
