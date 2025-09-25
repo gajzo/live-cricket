@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Match Streaming - Premium Sports</title>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <!-- Shaka Player for DASH streaming -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.1/shaka-player.compiled.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         * {
@@ -288,12 +289,12 @@
             padding: 0 20px;
         }
 
-        /* Live Scorecard */
+        /* Modern Scorecard Styles - With Original Theme */
         .scorecard {
             background: linear-gradient(135deg, rgba(25, 25, 45, 0.6) 0%, rgba(15, 15, 35, 0.8) 100%);
             backdrop-filter: blur(20px);
             border-radius: 20px;
-            padding: 25px 30px;
+            padding: 32px;
             margin: 25px 0;
             box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
             border: 1px solid var(--border);
@@ -302,23 +303,17 @@
             transition: all 0.3s ease;
         }
 
-        .match-info {
+        .match-header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 40px;
         }
 
-        .match-title {
-            font-size: 1.8rem;
-            margin-bottom: 10px;
-            font-weight: 700;
-            color: var(--accent-secondary);
-        }
-
+        /* Keep original live badge styling */
         .live-badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-                        background: #ef4444;
+            background: #ef4444;
             padding: 6px 20px;
             border-radius: 50px;
             font-size: 0.85rem;
@@ -359,144 +354,289 @@
             }
         }
 
-        .score-display {
-            display: flex;
-            justify-content: center;
+        .match-title {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--accent-secondary);
+        }
+
+        .match-status {
+            font-size: 1rem;
+            color: var(--text-dim);
+            margin-bottom: 4px;
+        }
+
+                .last-update {
+            font-size: 0.875rem;
+            color: var(--text-dim);
+            opacity: 0.8;
+        }
+
+        /* Score Board Layout */
+        .score-board {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 60px;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 40px;
-            margin-bottom: 20px;
+            margin-bottom: 32px;
         }
 
-        .team-score {
-            text-align: center;
-            padding: 20px 30px;
+        .team-container {
             background: rgba(20, 20, 40, 0.4);
-            border-radius: 15px;
-            min-width: 200px;
+            border-radius: 20px;
+            padding: 28px;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 3px solid transparent;
+            backdrop-filter: blur(10px);
+        }
+
+        .batting-team {
+            border-color: #6366f1;
+            background: linear-gradient(135deg, rgba(20, 20, 40, 0.4) 0%, rgba(16, 185, 129, 0.15) 100%);
+            box-shadow: 0 0 40px rgba(16, 185, 129, 0.3);
+        }
+
+        /* Bowling team styling */
+        .team-container:not(.batting-team) {
+            border: 2px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .team-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 24px;
             position: relative;
-            overflow: hidden;
-            border: 1px solid rgba(99, 102, 241, 0.1);
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1);
-            cursor: pointer;
         }
 
-        /* Subtle glow effect on hover */
-        .team-score::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: radial-gradient(circle at center, var(--accent) 0%, transparent 70%);
-            opacity: 0;
-            transition: opacity 0.4s ease;
-            pointer-events: none;
+        .team-badge {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
 
-        .team-score::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 120%;
-            height: 120%;
-            background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 50%);
-            transform: translate(-50%, -50%) scale(0);
-            transition: transform 0.4s ease;
-            pointer-events: none;
+        .batting-badge {
+            background: linear-gradient(135deg, #4267eb 0%, #5a7ff2 100%);
         }
 
-        .team-score:hover {
-            transform: translateY(-5px);
-            background: rgba(30, 30, 50, 0.6);
-            border-color: rgba(99, 102, 241, 0.3);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-        }
-
-        .team-score:hover::before {
-            opacity: 0.05;
-        }
-
-        .team-score:hover::after {
-            transform: translate(-50%, -50%) scale(1);
+        .bowling-badge {
+            background: linear-gradient(135deg, #ef4444 0%, #f56565 100%);
         }
 
         .team-name {
-            font-size: 1.2rem;
-            margin-bottom: 10px;
+            font-size: 1.25rem;
             font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            opacity: 0.9;
-            transition: all 0.3s ease;
+            color: white;
         }
 
-        .team-score:hover .team-name {
-            opacity: 1;
+        .batting-indicator {
+            position: absolute;
+            top: -12px;
+            right: -10px;
+            background: #10b981;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+            animation: pulse 2s infinite;
         }
 
-        .score {
-            font-size: 2.5rem;
-            font-weight: 800;
-            color: var(--accent);
-            margin-bottom: 3px;
-            transition: all 0.3s ease;
-            text-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.9; }
         }
 
-        .team-score:hover .score {
-            transform: scale(1.05);
-        }
-
-        .overs {
-            font-size: 1rem;
-            opacity: 0.6;
-            font-weight: 300;
-        }
-
-        /* Run Rate Display */
-        .run-rate-container {
-            background: rgba(20, 20, 40, 0.3);
-            border-radius: 15px;
-            padding: 15px;
-            margin-top: 15px;
+        .score-section {
             display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .score-display {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .runs {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: white;
+            line-height: 1;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .wickets-separator {
+            font-size: 2.5rem;
+            font-weight: 300;
+            color: var(--text-dim);
+        }
+
+        .wickets {
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: white;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .yet-to-bat {
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: var(--text-dim);
+        }
+
+        .overs-display {
+            font-size: 1rem;
+            color: var(--text-dim);
+        }
+
+        .run-rate-display {
+            font-size: 0.875rem;
+            color: var(--text-dim);
+            opacity: 0.8;
+        }
+
+        /* Center Info */
+        .center-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             justify-content: center;
-            gap: 30px;
-            flex-wrap: wrap;
+            gap: 24px;
+        }
+
+        .vs-text {
+            font-size: 2rem;
+            font-weight: 300;
+            color: var(--text-dim);
+            letter-spacing: 2px;
+            opacity: 0.6;
+        }
+
+        .target-section {
+            text-align: center;
+        }
+
+        .target-label {
+            font-size: 1rem;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+        }
+
+        .progress-bar-container {
+            width: 240px;
+            height: 6px;
+            background: rgba(67, 66, 66, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .balls-remaining {
+            font-size: 0.875rem;
+            color: var(--text-dim);
+            opacity: 0.8;
+        }
+
+        /* Batsmen Section */
+        .batsmen-container {
+            background: rgba(20, 20, 40, 0.3);
+            border-radius: 16px;
+            padding: 24px;
+            margin-top: 24px;
             border: 1px solid rgba(99, 102, 241, 0.1);
             backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
         }
 
-        .rate-box {
+        .batsmen-title {
             text-align: center;
-            padding: 8px 20px;
+            font-size: 1.125rem;
+            color: var(--accent-secondary);
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .batsmen-display {
+            display: flex;
+            justify-content: space-around;
+            gap: 40px;
+        }
+
+        .batsman-info {
+            text-align: center;
+            padding: 16px 32px;
+            background: rgba(99, 102, 241, 0.05);
+            border-radius: 12px;
+            min-width: 200px;
+            border: 1px solid rgba(99, 102, 241, 0.1);
             transition: all 0.3s ease;
         }
 
-        .rate-label {
-            font-size: 0.8rem;
-            opacity: 0.6;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+        .batsman-info:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(99, 102, 241, 0.2);
+            background: rgba(99, 102, 241, 0.1);
         }
 
-        .rate-value {
-            font-size: 1.6rem;
-            font-weight: 700;
-            color: var(--accent-secondary);
-            text-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+        .batsman-name {
+            display: block;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 8px;
         }
 
-        .vs-divider {
-            font-size: 2rem;
-            font-weight: 200;
-            opacity: 0.3;
-            align-self: center;
+        .batsman-stats {
+            display: block;
+            font-size: 1rem;
+            color: var(--text-dim);
+        }
+
+        /* Refresh Button */
+        .refresh-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid var(--border);
+            padding: 10px 24px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-btn:hover {
+            background: var(--surface-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(99, 102, 241, 0.3);
+            border-color: var(--accent);
         }
 
         /* Language Selection */
@@ -545,7 +685,7 @@
             background: var(--surface);
         }
 
-        .lang-btn.active {
+                .lang-btn.active {
             background: var(--accent);
             border-color: transparent;
             box-shadow: 0 10px 30px var(--glow);
@@ -630,30 +770,36 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Refresh Button */
-        .refresh-btn {
+        /* Stream Quality Info */
+        .quality-info {
             position: absolute;
-            top: 12px;
-            right: 12px;
-            background: rgba(20, 20, 40, 0.6);
-            color: white;
-            border: 1px solid rgba(99, 102, 241, 0.2);
-            padding: 8px 18px;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
             display: flex;
-            align-items: center;
-            gap: 8px;
+            gap: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 10;
         }
 
-        .refresh-btn:hover {
-            transform: translateY(-2px);
-            background: rgba(30, 30, 50, 0.8);
-            border-color: rgba(99, 102, 241, 0.4);
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        .quality-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .quality-label {
+            opacity: 0.6;
+            font-size: 0.75rem;
+        }
+
+        .quality-value {
+            font-weight: 600;
+            color: var(--accent-secondary);
         }
 
         /* Notification styles */
@@ -674,24 +820,7 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        /* Connection status */
-        #connectionStatus {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            padding: 12px 24px;
-            border-radius: 12px;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
-            font-weight: 500;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
-        }
-
-                /* Animations */
+        /* Animations */
         @keyframes fadeOut {
             from { opacity: 1; }
             to { opacity: 0; }
@@ -719,7 +848,7 @@
             }
         }
 
-        /* Responsive */
+        /* Responsive Design */
         @media (max-width: 768px) {
             .popup-content {
                 padding: 40px 30px;
@@ -738,17 +867,34 @@
                 font-size: 1.4rem;
             }
 
-            .team-score {
-                min-width: 140px;
-                padding: 15px 20px;
+            .score-board {
+                grid-template-columns: 1fr;
+                gap: 24px;
             }
 
-            .score {
-                font-size: 2rem;
+            .center-info {
+                order: -1;
             }
 
-            .rate-value {
-                font-size: 1.3rem;
+            .team-container {
+                padding: 20px;
+            }
+
+            .runs {
+                font-size: 3rem;
+            }
+
+            .wickets {
+                font-size: 2.25rem;
+            }
+
+            .batsmen-display {
+                flex-direction: column;
+                gap: 16px;
+            }
+
+            .batsman-info {
+                min-width: auto;
             }
 
             .lang-btn {
@@ -759,6 +905,11 @@
 
             .scorecard {
                 padding: 20px;
+            }
+
+            .quality-info {
+                font-size: 0.7rem;
+                padding: 6px 10px;
             }
         }
     </style>
@@ -788,37 +939,72 @@
                 <i class="fas fa-sync-alt"></i> Refresh
             </button>
             
-            <div class="match-info">
+            <div class="match-header">
                 <span class="live-badge">LIVE</span>
                 <h1 class="match-title" id="matchTitle">Loading match...</h1>
-                <p style="opacity: 0.6; font-size: 0.95rem;" id="matchStatus">Fetching live data...</p>
+                <p class="match-status" id="matchStatus">Live Match</p>
+                <p class="last-update" id="lastUpdate">Updated: --:--:-- --</p>
             </div>
             
-            <div class="score-display">
-                <div class="team-score" id="team1">
-                    <div class="team-name">Team 1</div>
-                    <div class="score">0-0</div>
-                    <div class="overs">(0.0 overs)</div>
+            <div class="score-board">
+                <!-- Batting Team (Left Side) -->
+                <div class="team-container batting-team" id="battingTeamContainer">
+                    <div class="team-header">
+                        <div class="team-badge batting-badge" id="battingTeamBadge">T1</div>
+                        <span class="team-name" id="battingTeamName">Team 1</span>
+                        <span class="batting-indicator">Batting</span>
+                    </div>
+                    <div class="score-section">
+                        <div class="score-display">
+                            <span class="runs" id="battingTeamRuns">0</span>
+                            <span class="wickets-separator">/</span>
+                            <span class="wickets" id="battingTeamWickets">0</span>
+                        </div>
+                        <div class="overs-display" id="battingTeamOvers">(0.0 overs)</div>
+                        <div class="run-rate-display" id="battingTeamRunRate">Run Rate: 0.00</div>
+                    </div>
                 </div>
-                
-                <div class="vs-divider">VS</div>
-                
-                <div class="team-score" id="team2">
-                    <div class="team-name">Team 2</div>
-                    <div class="score">Yet to bat</div>
-                    <div class="overs">-</div>
+
+                <!-- Center Info -->
+                <div class="center-info">
+                    <div class="vs-text">VS</div>
+                    <div class="target-section" id="targetSection" style="display: none;">
+                        <div class="target-label">Target: <span id="targetScore">0</span></div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="progressBar"></div>
+                        </div>
+                        <div class="balls-remaining" id="ballsRemaining">0 balls remaining</div>
+                    </div>
+                </div>
+
+                <!-- Bowling/Other Team (Right Side) -->
+                <div class="team-container" id="bowlingTeamContainer">
+                    <div class="team-header">
+                        <div class="team-badge bowling-badge" id="bowlingTeamBadge">T2</div>
+                        <span class="team-name" id="bowlingTeamName">Team 2</span>
+                    </div>
+                    <div class="score-section">
+                        <div class="score-display" id="bowlingTeamScore">
+                            <span class="yet-to-bat">Yet to bat</span>
+                        </div>
+                        <div class="overs-display" id="bowlingTeamOvers">-</div>
+                        <div class="run-rate-display" id="bowlingTeamRunRate" style="opacity: 0;">Run Rate: 0.00</div>
+                    </div>
                 </div>
             </div>
-            
-            <!-- Run Rate Display -->
-            <div class="run-rate-container">
-                <div class="rate-box">
-                    <div class="rate-label">Current Run Rate</div>
-                    <div class="rate-value" id="currentRunRate">0.00</div>
-                </div>
-                <div class="rate-box" id="requiredRunRateBox" style="display: none;">
-                    <div class="rate-label">Required Run Rate</div>
-                    <div class="rate-value" id="requiredRunRate">0.00</div>
+
+            <!-- Current Batsmen -->
+            <div class="batsmen-container" id="batsmenSection" style="display: none;">
+                <h3 class="batsmen-title">At the Crease</h3>
+                <div class="batsmen-display">
+                    <div class="batsman-info" id="batsman1">
+                        <span class="batsman-name">Batsman 1</span>
+                        <span class="batsman-stats">0 (0) • SR: 0.00</span>
+                    </div>
+                    <div class="batsman-info" id="batsman2">
+                        <span class="batsman-name">Batsman 2</span>
+                        <span class="batsman-stats">0 (0) • SR: 0.00</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -836,8 +1022,24 @@
             </button>
         </div>
 
-        <!-- Video Player -->
+                <!-- Video Player -->
         <div class="video-container">
+            <!-- Stream Quality Info -->
+            <div class="quality-info" id="qualityInfo" style="display: none;">
+                <div class="quality-item">
+                    <span class="quality-label">Quality:</span>
+                    <span class="quality-value" id="streamQuality">HD</span>
+                </div>
+                <div class="quality-item">
+                    <span class="quality-label">Bandwidth:</span>
+                    <span class="quality-value" id="streamBandwidth">0 Mbps</span>
+                </div>
+                <div class="quality-item">
+                    <span class="quality-label">Buffer:</span>
+                    <span class="quality-value" id="streamBuffer">0s</span>
+                </div>
+            </div>
+            
             <video id="videoPlayer" controls></video>
             <div class="youtube-container" id="youtubeContainer">
                 <iframe id="youtubePlayer" 
@@ -855,745 +1057,877 @@
         </div>
     </div>
 
-    <script>
-        // Configuration
-        const config = {
-            backendUrl: window.location.hostname === 'localhost' 
-                ? 'http://localhost:5000'
-                : 'https://live-cricket-k3it.onrender.com',
-            streamUrls: {
-                english: 'https://dish.slivcdn.com/hls/live/2020591/TEN3HD/master_3500.m3u8',
-                hindi: 'https://dish.slivcdn.com/hls/live/2020591/TEN3HD/master_3500.m3u8',
-                regional: 'https://www.youtube.com/embed/GoHDolSJxIQ'
+   <script>
+    // Configuration
+    const config = {
+        backendUrl: (() => {
+            const hostname = window.location.hostname;
+            
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                return 'http://localhost:5000';
             }
-        };
+            
+            if (window.location.protocol === 'file:') {
+                return 'http://localhost:5000';
+            }
+            
+            // Update this to your actual backend URL when deployed
+            return 'https://your-python-backend.onrender.com';
+        })(),
+        
+        streamUrls: {
+            // These are test streams that should work
+            english: 'https://in-mc-fdlive.fancode.com/mumbai/137075_english_hls_ccd31b8b6288331ta-di_h264/1080p.m3u8',
+            hindi: 'https://sundirectgo-live.pc.cdn.bitgravity.com/hd21/video-stream-1_SD_DRM-2-init.mp4',
+            
+            // Alternative working streams
+            fallback: {
+                english: [
+                    'https://in-mc-fdlive.fancode.com/mumbai/137075_english_hls_ccd31b8b6288331ta-di_h264/1080p.m3u8',
+                    'https://sundirectgo-live.pc.cdn.bitgravity.com/hd21/video-stream-1_SD_DRM-2-init.mp4',
+                    'https://sundirectgo-live.pc.cdn.bitgravity.com/hd21/dth.mpd'
+                ],
+                hindi: [
+                    'https://livesim.dashif.org/livesim/chunkdur_1/ato_7/testpic4_8s/Manifest.mpd',
+                    'https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd'
+                ]
+            },
+            
+            regional: 'https://www.youtube.com/embed/GoHDolSJxIQ'
+        }
+    };
 
-        let hls = null;
-        let currentLanguage = 'english';
-        let scoreUpdateInterval = null;
-        let cricketScoreAPI = null;
+    // Global variables
+    let player = null;
+    let currentLanguage = 'english';
+    let cricketScoreAPI = null;
+    let qualityInterval = null;
+    let currentStreamIndex = 0;
 
-        // Reduced particle system
-        class ParticleSystem {
-            constructor() {
-                this.container = document.getElementById('particles');
-                this.mouseX = 0;
-                this.mouseY = 0;
-                this.lastParticleTime = 0;
-                this.init();
+    // Start cricket score updates immediately on page load
+    window.addEventListener('DOMContentLoaded', async () => {
+        console.log(`Checking backend at: ${config.backendUrl}`);
+        
+        // Initialize cricket score API immediately
+        cricketScoreAPI = new CricketScoreAPI();
+        cricketScoreAPI.startLiveUpdates();
+        
+        try {
+            const response = await fetch(`${config.backendUrl}/api/status`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                mode: 'cors',
+                signal: AbortSignal.timeout(5000)
+            });
+            
+            if (response.ok) {
+                console.log('Backend connected successfully');
+                const status = await response.json();
+                // Removed notification - just log it
+                if (!status.has_data) {
+                    console.log('No match data available yet');
+                }
+            }
+        } catch (error) {
+            console.warn('Backend not available:', error);
+            // Removed notification - just log it
+        }
+    });
+
+    // Fixed Shaka Player initialization
+    async function initPlayer(url) {
+        const video = document.getElementById('videoPlayer');
+        const youtubeContainer = document.getElementById('youtubeContainer');
+        const youtube = document.getElementById('youtubePlayer');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+
+        // Handle YouTube for regional
+        if (currentLanguage === 'regional') {
+            video.style.display = 'none';
+            youtubeContainer.style.display = 'block';
+            youtube.src = `${url}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&modestbranding=1&fs=0&iv_load_policy=3&disablekb=1`;
+            loadingIndicator.style.display = 'none';
+            
+            if (player) {
+                await player.destroy();
+                player = null;
+            }
+            
+            if (qualityInterval) {
+                clearInterval(qualityInterval);
+                document.getElementById('qualityInfo').style.display = 'none';
+            }
+            
+            return;
+        }
+
+        // Handle DASH/HLS streams
+        video.style.display = 'block';
+        youtubeContainer.style.display = 'none';
+        youtube.src = '';
+
+        try {
+            // Check browser support
+            if (!shaka.Player.isBrowserSupported()) {
+                console.error('Browser does not support Shaka Player');
+                throw new Error('Browser does not support required streaming formats');
             }
 
-            init() {
-                document.addEventListener('mousemove', (e) => {
-                    this.mouseX = e.clientX;
-                    this.mouseY = e.clientY;
-                    
-                    // Create particles less frequently
-                    const currentTime = Date.now();
-                    if (currentTime - this.lastParticleTime > 100) { // Only create particle every 100ms
-                        if (Math.random() > 0.7) { // 30% chance to create particle
-                            this.createParticle(e.clientX, e.clientY);
-                            this.lastParticleTime = currentTime;
+            // Destroy existing player if any
+            if (player) {
+                await player.destroy();
+                player = null;
+            }
+
+            // Create new player using attach method (new way)
+            player = new shaka.Player();
+            await player.attach(video);
+            
+            // Configure player with robustness levels
+            player.configure({
+                drm: {
+                    servers: {
+                        'com.widevine.alpha': '',
+                        'com.microsoft.playready': ''
+                    },
+                    advanced: {
+                        'com.widevine.alpha': {
+                            'videoRobustness': 'SW_SECURE_CRYPTO',
+                            'audioRobustness': 'SW_SECURE_CRYPTO'
+                        },
+                        'com.microsoft.playready': {
+                            'videoRobustness': 'SW_SECURE_CRYPTO',
+                            'audioRobustness': 'SW_SECURE_CRYPTO'
                         }
+                    },
+                    retryParameters: {
+                        timeout: 10000,
+                        maxAttempts: 3,
+                        baseDelay: 1000,
+                        backoffFactor: 2,
+                        fuzzFactor: 0.5
                     }
+                },
+                streaming: {
+                    bufferingGoal: 30,
+                    rebufferingGoal: 15,
+                    bufferBehind: 30,
+                    retryParameters: {
+                        timeout: 30000,
+                        maxAttempts: 5,
+                        baseDelay: 1000,
+                        backoffFactor: 2,
+                        fuzzFactor: 0.5
+                    }
+                },
+                manifest: {
+                    retryParameters: {
+                        timeout: 30000,
+                        maxAttempts: 5,
+                        baseDelay: 1000,
+                        backoffFactor: 2,
+                        fuzzFactor: 0.5
+                    },
+                    dash: {
+                        clockSyncUri: '',
+                        ignoreDrmInfo: true,
+                        xlinkFailGracefully: true,
+                        autoCorrectDrift: true
+                    }
+                },
+                abr: {
+                    enabled: true,
+                    defaultBandwidthEstimate: 2000000
+                }
+            });
+
+            // Add event listeners
+            player.addEventListener('error', onPlayerError);
+            player.addEventListener('buffering', onBuffering);
+            player.addEventListener('adaptation', onAdaptation);
+            
+            // Configure network filters for CORS
+            player.getNetworkingEngine().registerRequestFilter((type, request) => {
+                // Add necessary headers
+                if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST ||
+                    type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
+                    request.allowCrossSiteCredentials = false;
+                    // Don't send custom headers that might trigger CORS preflight
+                    delete request.headers['Origin'];
+                    delete request.headers['Referer'];
+                }
+            });
+
+            console.log('Attempting to load stream:', url);
+            
+            // Try to load the stream
+            await player.load(url);
+            
+            console.log('Stream loaded successfully');
+            loadingIndicator.style.display = 'none';
+            
+            // Start monitoring quality
+            startQualityMonitoring();
+            
+            // Try to auto-play
+            try {
+                await video.play();
+            } catch (e) {
+                console.log('Autoplay prevented, user interaction required');
+                // Removed notification
+            }
+
+        } catch (error) {
+            console.error('Error loading stream:', error);
+            
+            if (error.code === 6012) {
+                console.log('Stream access denied. Trying alternative source...');
+            }
+            
+            // Try fallback streams
+            await handleStreamError(error);
+        }
+    }
+
+        // Player event handlers
+    function onPlayerError(error) {
+        console.error('Player error', error.detail);
+        
+        const errorMessages = {
+            1001: 'Stream not found',
+            1002: 'Network connection error',
+            1003: 'Stream decode error',
+            3016: 'No supported stream format',
+            4000: 'Stream authentication required',
+            6001: 'License server error',
+            6012: 'Network request failed - possible CORS/access issue',
+            6013: 'Network timeout',
+            7000: 'Storage error'
+        };
+        
+        const message = errorMessages[error.detail.code] || 'Stream error';
+        console.log('Stream error:', message); // Just log instead of showing notification
+        
+        // Only try to recover from non-fatal errors
+        if (error.detail.severity !== shaka.util.Error.Severity.CRITICAL) {
+            handleStreamError(error.detail);
+        }
+    }
+
+    function onBuffering(buffering) {
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        if (buffering.buffering) {
+            loadingIndicator.style.display = 'block';
+            loadingIndicator.innerHTML = '<div class="loading-spinner"></div><p style="margin-top: 20px; opacity: 0.8;">Buffering...</p>';
+        } else {
+            loadingIndicator.style.display = 'none';
+        }
+    }
+
+    function onAdaptation() {
+        if (player) {
+            const tracks = player.getVariantTracks();
+            const activeTrack = tracks.find(track => track.active);
+            if (activeTrack) {
+                console.log(`Quality: ${activeTrack.width}x${activeTrack.height} @ ${(activeTrack.bandwidth / 1e6).toFixed(2)} Mbps`);
+                document.getElementById('streamQuality').textContent = `${activeTrack.height}p`;
+            }
+        }
+    }
+
+    // Stream error handling with working fallbacks
+    async function handleStreamError(error) {
+        console.error('Handling stream error, trying fallback...');
+        
+        const fallbackUrls = config.streamUrls.fallback[currentLanguage];
+        
+        if (fallbackUrls && currentStreamIndex < fallbackUrls.length - 1) {
+            currentStreamIndex++;
+            const fallbackUrl = fallbackUrls[currentStreamIndex];
+            
+            console.log(`Trying fallback stream ${currentStreamIndex + 1}/${fallbackUrls.length}`);
+            
+            try {
+                if (player) {
+                    await player.unload();
+                }
+                
+                // Small delay before trying next stream
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                await initPlayer(fallbackUrl);
+                console.log('Switched to backup stream');
+            } catch (e) {
+                console.error('Fallback stream failed:', e);
+                // Try next fallback
+                await handleStreamError(e);
+            }
+        } else {
+            document.getElementById('loadingIndicator').innerHTML = 
+                '<p style="color: #ef4444;">Unable to load streams. Please check your connection or try again later.</p>';
+            console.error('All streams failed');
+        }
+    }
+
+    // Quality monitoring
+    function startQualityMonitoring() {
+        document.getElementById('qualityInfo').style.display = 'flex';
+        
+        qualityInterval = setInterval(() => {
+            if (player && player.getStats) {
+                const stats = player.getStats();
+                const video = document.getElementById('videoPlayer');
+                
+                // Update bandwidth
+                const bandwidth = (stats.estimatedBandwidth / 1e6).toFixed(2);
+                document.getElementById('streamBandwidth').textContent = bandwidth + ' Mbps';
+                
+                // Update buffer time
+                const bufferedEnd = video.buffered.length > 0 ? video.buffered.end(0) : 0;
+                const bufferTime = (bufferedEnd - video.currentTime).toFixed(1);
+                document.getElementById('streamBuffer').textContent = Math.max(0, bufferTime) + 's';
+            }
+        }, 2000);
+    }
+
+    // Cricket Score API Class
+    class CricketScoreAPI {
+        constructor() {
+            this.backendUrl = config.backendUrl;
+            this.updateInterval = null;
+            this.errorCount = 0;
+            this.maxErrors = 3;
+        }
+
+        async fetchCurrentScore() {
+            try {
+                const response = await fetch(`${this.backendUrl}/api/current-score`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    mode: 'cors'
                 });
-
-                // Create fewer ambient particles
-                setInterval(() => {
-                    const x = Math.random() * window.innerWidth;
-                    const y = Math.random() * window.innerHeight;
-                    this.createAmbientParticle(x, y);
-                }, 2000); // Reduced frequency
-            }
-
-            createParticle(x, y) {
-                const particle = document.createElement('div');
-                particle.className = 'particle';
                 
-                const size = Math.random() * 4 + 2;
-                const angle = Math.random() * Math.PI * 2;
-                const velocity = Math.random() * 50 + 30;
+                const data = await response.json();
                 
-                particle.style.width = size + 'px';
-                particle.style.height = size + 'px';
-                particle.style.left = x + 'px';
-                particle.style.top = y + 'px';
-                particle.style.setProperty('--tx', Math.cos(angle) * velocity + 'px');
-                particle.style.setProperty('--ty', Math.sin(angle) * velocity + 'px');
-                particle.style.boxShadow = `0 0 ${size * 2}px ${size / 2}px rgba(99, 102, 241, 0.5)`;
+                if (response.ok) {
+                    this.errorCount = 0;
+                    this.updateDisplay(data);
+                    return data;
+                } else {
+                    throw new Error(data.error || 'Failed to fetch scores');
+                }
+            } catch (error) {
+                console.error('Error fetching scores:', error);
+                this.errorCount++;
                 
-                this.container.appendChild(particle);
+                if (error.message === 'Failed to fetch') {
+                    console.error('Cannot reach backend. Make sure Python app is running.');
+                    document.getElementById('matchStatus').textContent = 'Score service unavailable';
+                }
                 
-                setTimeout(() => particle.remove(), 3000);
-            }
-
-            createAmbientParticle(x, y) {
-                const particle = document.createElement('div');
-                particle.className = 'particle';
+                if (this.errorCount >= this.maxErrors) {
+                    this.stopUpdates();
+                }
                 
-                particle.style.width = '2px';
-                particle.style.height = '2px';
-                particle.style.left = x + 'px';
-                particle.style.top = y + 'px';
-                particle.style.setProperty('--tx', (Math.random() - 0.5) * 100 + 'px');
-                particle.style.setProperty('--ty', -Math.random() * 200 + 'px');
-                particle.style.boxShadow = '0 0 4px 1px rgba(129, 140, 248, 0.3)';
-                particle.style.animationDuration = '6s';
-                
-                this.container.appendChild(particle);
-                
-                setTimeout(() => particle.remove(), 6000);
+                return null;
             }
         }
 
-        // Initialize particle system
-        const particleSystem = new ParticleSystem();
+        updateDisplay(data) {
+            // Update match header
+            const shortTitle = `${data.team1_name || 'Team 1'} vs ${data.team2_name || 'Team 2'}`;
+            document.getElementById('matchTitle').textContent = shortTitle;
+            document.getElementById('matchStatus').textContent = data.update || 'Live Match';
+            
+            // Update last update time
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = `Updated: ${now.toLocaleTimeString()}`;
 
-        // Cricket Score API Class
-        class CricketScoreAPI {
-            constructor() {
-                this.backendUrl = config.backendUrl;
-                this.updateInterval = null;
-            }
+            // Determine which team is batting (team1 is always batting in the data)
+            const battingTeamData = {
+                name: data.team1_name || 'Team 1',
+                score: data.team1_score || '0',
+                wickets: data.team1_wickets || '0',
+                overs: data.team1_overs || '0.0',
+                runRate: this.calculateRunRate(data.team1_score, data.team1_overs)
+            };
 
-            async fetchCurrentScore() {
-                try {
-                    const response = await fetch(`${this.backendUrl}/api/current-score`);
-                    const data = await response.json();
-                    
-                    if (response.ok) {
-                        this.updateDisplay(data);
-                        return data;
-                    } else {
-                        throw new Error(data.error || 'Failed to fetch scores');
-                    }
-                } catch (error) {
-                    console.error('Error fetching scores:', error);
-                    document.getElementById('matchStatus').textContent = 'Unable to fetch live scores';
-                    return null;
-                }
-            }
+            const bowlingTeamData = {
+                name: data.team2_name || 'Team 2',
+                score: data.team2_score || '0',
+                wickets: data.team2_wickets || '0',
+                overs: data.team2_overs || '0.0',
+                runRate: this.calculateRunRate(data.team2_score, data.team2_overs)
+            };
 
-            updateDisplay(data) {
-                // Update match title
-                const shortTitle = `${data.team1_name || 'Team 1'} vs ${data.team2_name || 'Team 2'}`;
-                document.getElementById('matchTitle').textContent = shortTitle;
-                document.getElementById('matchStatus').textContent = data.update || 'Live Match';
+            // Update batting team (left side)
+            document.getElementById('battingTeamBadge').textContent = battingTeamData.name.substring(0, 1).toUpperCase();
+            document.getElementById('battingTeamName').textContent = battingTeamData.name;
+            document.getElementById('battingTeamRuns').textContent = battingTeamData.score;
+            document.getElementById('battingTeamWickets').textContent = battingTeamData.wickets;
+            document.getElementById('battingTeamOvers').textContent = `(${battingTeamData.overs} overs)`;
+            document.getElementById('battingTeamRunRate').textContent = `Run Rate: ${battingTeamData.runRate}`;
 
-                // Update Team 1 score with animation
-                const team1 = document.getElementById('team1');
-                this.animateScore(team1, {
-                    name: data.team1_name || 'Team 1',
-                    score: `${data.team1_score || '0'}-${data.team1_wickets || '0'}`,
-                    overs: `(${data.team1_overs || '0.0'} overs)`
-                });
+            // Update bowling team (right side)
+            document.getElementById('bowlingTeamBadge').textContent = bowlingTeamData.name.substring(0, 1).toUpperCase();
+            document.getElementById('bowlingTeamName').textContent = bowlingTeamData.name;
 
-                                // Update Team 2 score
-                const team2 = document.getElementById('team2');
-                if (data.team2_status && data.team2_status !== 'Yet to bat') {
-                    this.animateScore(team2, {
-                        name: data.team2_name || 'Team 2',
-                        score: `${data.team2_score || '0'}-${data.team2_wickets || '0'}`,
-                        overs: `(${data.team2_overs || '0.0'} overs)`
-                    });
-                } else {
-                    team2.querySelector('.team-name').textContent = data.team2_name || 'Team 2';
-                    team2.querySelector('.score').textContent = 'Yet to bat';
-                    team2.querySelector('.overs').textContent = '-';
-                }
+            const bowlingScoreDiv = document.getElementById('bowlingTeamScore');
+            const bowlingOversDiv = document.getElementById('bowlingTeamOvers');
+            const bowlingRunRateDiv = document.getElementById('bowlingTeamRunRate');
 
-                // Update run rates with animation
+            if (data.team2_status && data.team2_status !== 'Yet to bat') {
+                // Team 2 has batted (first innings)
+                bowlingScoreDiv.innerHTML = `
+                    <span class="runs">${bowlingTeamData.score}</span>
+                    <span class="wickets-separator">/</span>
+                    <span class="wickets">${bowlingTeamData.wickets}</span>
+                `;
+                bowlingOversDiv.textContent = `(${bowlingTeamData.overs} overs)`;
+                bowlingRunRateDiv.textContent = `Run Rate: ${bowlingTeamData.runRate}`;
+                bowlingRunRateDiv.style.opacity = '1';
+
+                // Show target and progress (team1 is chasing)
+                const target = parseInt(bowlingTeamData.score) + 1;
+                const currentScore = parseInt(battingTeamData.score);
+                const runsNeeded = target - currentScore;
+                const oversLeft = 50 - parseFloat(battingTeamData.overs);
+                const ballsRemaining = Math.floor(oversLeft * 6);
+
+                document.getElementById('targetSection').style.display = 'block';
+                document.getElementById('targetScore').textContent = target;
+                document.getElementById('ballsRemaining').textContent = `${ballsRemaining} balls remaining`;
+
+                // Update progress bar
+                const progress = (currentScore / target) * 100;
+                document.getElementById('progressBar').style.width = `${Math.min(progress, 100)}%`;
+
+                // Update run rates
                 if (data.runrate) {
                     const runRates = data.runrate.split(' | ');
-                    const crr = runRates[0].replace('CRR: ', '');
-                    this.animateValue('currentRunRate', parseFloat(crr));
-                    
-                    if (runRates.length > 1) {
+                    if (runRates[0]) {
+                        const crr = runRates[0].replace('CRR: ', '');
+                        document.getElementById('battingTeamRunRate').textContent = `Run Rate: ${crr}`;
+                    }
+                    if (runRates[1]) {
+                        // Show required run rate instead
                         const rrr = runRates[1].replace('RRR: ', '');
-                        this.animateValue('requiredRunRate', parseFloat(rrr));
-                        document.getElementById('requiredRunRateBox').style.display = 'block';
-                    } else {
-                        document.getElementById('requiredRunRateBox').style.display = 'none';
+                        const rrrBox = document.createElement('div');
+                        rrrBox.className = 'run-rate-display';
+                        rrrBox.style.color = '#ef4444';
+                        rrrBox.textContent = `Required RR: ${rrr}`;
+                        
+                        // Remove existing RRR if any
+                        const existingRRR = document.querySelector('#battingTeamContainer .score-section .run-rate-display[style*="color: rgb(239, 68, 68)"]');
+                        if (existingRRR) existingRRR.remove();
+                        
+                        document.querySelector('#battingTeamContainer .score-section').appendChild(rrrBox);
                     }
                 }
+            } else {
+                // Team 2 yet to bat
+                bowlingScoreDiv.innerHTML = '<span class="yet-to-bat">Yet to bat</span>';
+                bowlingOversDiv.textContent = '-';
+                bowlingRunRateDiv.style.opacity = '0';
+                document.getElementById('targetSection').style.display = 'none';
+            }
 
-                // Show success notification first time
-                if (!this.updateInterval) {
-                    showNotification('Live scores connected!', 'success');
+                        // Update batsmen information
+            const batsman1Name = data.batterone || null;
+            const batsman2Name = data.battertwo || null;
+
+            if (batsman1Name && batsman1Name !== 'Batsman 1') {
+                const batsman1El = document.getElementById('batsman1');
+                batsman1El.querySelector('.batsman-name').textContent = batsman1Name;
+                const balls1 = data.batsmanoneball ? data.batsmanoneball.replace(/[()]/g, '') : '0';
+                batsman1El.querySelector('.batsman-stats').textContent = 
+                    `${data.batsmanonerun || '0'} (${balls1}) • SR: ${data.batsmanonesr || '0.00'}`;
+                
+                document.getElementById('batsmenSection').style.display = 'block';
+
+                if (batsman2Name && batsman2Name !== 'Batsman 2') {
+                    const batsman2El = document.getElementById('batsman2');
+                    batsman2El.querySelector('.batsman-name').textContent = batsman2Name;
+                    const balls2 = data.batsmantwoball ? data.batsmantwoball.replace(/[()]/g, '') : '0';
+                    batsman2El.querySelector('.batsman-stats').textContent = 
+                        `${data.batsmantworun || '0'} (${balls2}) • SR: ${data.batsmantwosr || '0.00'}`;
                 }
+            } else {
+                document.getElementById('batsmenSection').style.display = 'none';
             }
 
-            animateScore(element, data) {
-                element.querySelector('.team-name').textContent = data.name;
-                const scoreEl = element.querySelector('.score');
-                const oversEl = element.querySelector('.overs');
-                
-                scoreEl.style.transform = 'scale(1.05)';
-                setTimeout(() => {
-                    scoreEl.textContent = data.score;
-                    scoreEl.style.transform = 'scale(1)';
-                }, 200);
-                
-                oversEl.textContent = data.overs;
-            }
-
-            animateValue(elementId, value) {
-                const element = document.getElementById(elementId);
-                const current = parseFloat(element.textContent) || 0;
-                const diff = value - current;
-                const duration = 500;
-                const steps = 20;
-                const stepValue = diff / steps;
-                let step = 0;
-
-                const interval = setInterval(() => {
-                    step++;
-                    if (step <= steps) {
-                        element.textContent = (current + stepValue * step).toFixed(2);
-                    } else {
-                        clearInterval(interval);
-                        element.textContent = value.toFixed(2);
-                    }
-                }, duration / steps);
-            }
-
-            startLiveUpdates() {
-                // Initial fetch
-                this.fetchCurrentScore();
-                
-                // Update every 10 seconds
-                this.updateInterval = setInterval(() => {
-                    this.fetchCurrentScore();
-                }, 10000);
-            }
-
-            stopUpdates() {
-                if (this.updateInterval) {
-                    clearInterval(this.updateInterval);
-                    this.updateInterval = null;
-                }
+            if (!this.updateInterval) {
+                updateConnectionStatus(true);
             }
         }
 
-        // Initialize video player
-        function initPlayer(url) {
-            const video = document.getElementById('videoPlayer');
-            const youtubeContainer = document.getElementById('youtubeContainer');
-            const youtube = document.getElementById('youtubePlayer');
-            const loadingIndicator = document.getElementById('loadingIndicator');
+        // Add this helper method to CricketScoreAPI class
+        calculateRunRate(runs, overs) {
+            const runsInt = parseInt(runs) || 0;
+            const oversFloat = parseFloat(overs) || 0;
+            
+            if (oversFloat === 0) return '0.00';
+            
+            // Convert overs to balls
+            const oversPart = Math.floor(oversFloat);
+            const ballsPart = Math.round((oversFloat - oversPart) * 10);
+            const totalBalls = oversPart * 6 + ballsPart;
+            
+            // Calculate run rate
+            const runRate = (runsInt / totalBalls) * 6;
+            
+            return runRate.toFixed(2);
+        }
 
-            // Handle YouTube for regional - Completely hide YouTube UI
-            if (currentLanguage === 'regional') {
-                video.style.display = 'none';
-                youtubeContainer.style.display = 'block';
-                // Parameters to hide everything possible
-                youtube.src = `${url}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&modestbranding=1&fs=0&iv_load_policy=3&disablekb=1&enablejsapi=1&origin=${window.location.origin}&widget_referrer=${window.location.origin}`;
-                loadingIndicator.style.display = 'none';
-                
-                // Stop HLS if it was playing
-                if (hls) {
-                    hls.destroy();
-                    hls = null;
+        startLiveUpdates() {
+            this.fetchCurrentScore();
+            
+            this.updateInterval = setInterval(() => {
+                this.fetchCurrentScore();
+            }, 10000);
+        }
+
+        stopUpdates() {
+            if (this.updateInterval) {
+                clearInterval(this.updateInterval);
+                this.updateInterval = null;
+            }
+        }
+    }
+
+    // Add smooth score transitions
+    function animateScoreChange(element, newValue) {
+        const currentValue = parseInt(element.textContent) || 0;
+        const difference = newValue - currentValue;
+        
+        if (difference === 0) return;
+        
+        const duration = 500;
+        const steps = 20;
+        const stepValue = difference / steps;
+        let currentStep = 0;
+        
+        const interval = setInterval(() => {
+            currentStep++;
+            if (currentStep <= steps) {
+                element.textContent = Math.round(currentValue + (stepValue * currentStep));
+            } else {
+                clearInterval(interval);
+                element.textContent = newValue;
+            }
+        }, duration / steps);
+    }
+
+    // Enhanced refresh function with better feedback
+    async function refreshScores() {
+        const refreshBtn = document.querySelector('.refresh-btn');
+        const originalContent = refreshBtn.innerHTML;
+        
+        // Animate button
+        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+        refreshBtn.style.transform = 'scale(0.95)';
+        
+        try {
+            const response = await fetch(`${config.backendUrl}/api/scrape`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                mode: 'cors'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (cricketScoreAPI) {
+                    // Add animation to score updates
+                    const oldScore = document.getElementById('battingTeamRuns').textContent;
+                    cricketScoreAPI.updateDisplay(data);
+                    const newScore = document.getElementById('battingTeamRuns').textContent;
+                    
+                    if (oldScore !== newScore) {
+                        // Highlight score change
+                        const scoreElement = document.getElementById('battingTeamRuns');
+                        scoreElement.style.color = '#fbbf24';
+                        scoreElement.style.transform = 'scale(1.1)';
+                        setTimeout(() => {
+                            scoreElement.style.color = '';
+                            scoreElement.style.transform = '';
+                        }, 1000);
+                    }
                 }
+                console.log('Scores updated!');
+            } else {
+                throw new Error('Failed to refresh');
+            }
+        } catch (error) {
+            console.error('Failed to refresh scores');
+        } finally {
+            // Reset button
+            setTimeout(() => {
+                refreshBtn.innerHTML = originalContent;
+                refreshBtn.style.transform = '';
+            }, 500);
+        }
+    }
+
+    // Reduced particle system
+    class ParticleSystem {
+        constructor() {
+            this.container = document.getElementById('particles');
+            this.init();
+        }
+
+        init() {
+            // Disable on mobile for better performance
+            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
                 return;
             }
 
-            // Handle HLS streams
-            video.style.display = 'block';
-            youtubeContainer.style.display = 'none';
-            youtube.src = ''; // Clear YouTube src
-
-            if (Hls.isSupported()) {
-                if (hls) {
-                    hls.destroy();
+            document.addEventListener('mousemove', (e) => {
+                if (Math.random() > 0.95) {
+                    this.createParticle(e.clientX, e.clientY);
                 }
-                
-                hls = new Hls({
-                    enableWorker: true,
-                    lowLatencyMode: true,
-                });
-                
-                hls.loadSource(url);
-                hls.attachMedia(video);
-                
-                hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    loadingIndicator.style.display = 'none';
-                    video.play().catch(e => {
-                        console.log('Autoplay was prevented');
-                    });
-                });
-
-                hls.on(Hls.Events.ERROR, function(event, data) {
-                    if (data.fatal) {
-                        switch(data.type) {
-                            case Hls.ErrorTypes.NETWORK_ERROR:
-                                console.error('Fatal network error encountered, trying to recover');
-                                hls.startLoad();
-                                break;
-                            case Hls.ErrorTypes.MEDIA_ERROR:
-                                console.error('Fatal media error encountered, trying to recover');
-                                hls.recoverMediaError();
-                                break;
-                            default:
-                                console.error('Fatal error, cannot recover');
-                                hls.destroy();
-                                break;
-                        }
-                    }
-                });
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = url;
-                video.addEventListener('loadedmetadata', function() {
-                    loadingIndicator.style.display = 'none';
-                    video.play().catch(e => {
-                        console.log('Autoplay was prevented');
-                    });
-                });
-            }
-        }
-
-        // Close popup function
-        function closePopup() {
-            const popup = document.getElementById('welcomePopup');
-            popup.style.animation = 'fadeOut 0.5s ease';
-            setTimeout(() => {
-                popup.style.display = 'none';
-            }, 500);
-            
-            // Initialize player
-            initPlayer(config.streamUrls[currentLanguage]);
-            
-            // Start fetching cricket scores from Python backend
-            cricketScoreAPI = new CricketScoreAPI();
-            cricketScoreAPI.startLiveUpdates();
-        }
-
-        // Change language function
-        function changeLanguage(language, button) {
-            currentLanguage = language;
-            
-            document.querySelectorAll('.lang-btn').forEach(btn => {
-                btn.classList.remove('active');
             });
-            button.classList.add('active');
-            
-            document.getElementById('loadingIndicator').style.display = 'block';
-            initPlayer(config.streamUrls[language]);
-            
-            showNotification(`Switched to ${language.charAt(0).toUpperCase() + language.slice(1)} commentary`, 'success');
         }
 
-        // Refresh scores manually
-        async function refreshScores() {
-            const refreshBtn = document.querySelector('.refresh-btn');
-            const icon = refreshBtn.querySelector('i');
-            icon.style.transform = 'rotate(360deg)';
-            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
-            
-            if (cricketScoreAPI) {
-                await cricketScoreAPI.fetchCurrentScore();
-            }
-            
-            setTimeout(() => {
-                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
-            }, 1000);
-            
-            showNotification('Scores refreshed!', 'success');
+        createParticle(x, y) {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = x + 'px';
+            particle.style.top = y + 'px';
+            particle.style.setProperty('--tx', (Math.random() - 0.5) * 100 + 'px');
+            particle.style.setProperty('--ty', (Math.random() - 0.5) * 100 + 'px');
+            this.container.appendChild(particle);
+            setTimeout(() => particle.remove(), 3000);
         }
+    }
 
-        // Show notification function
-        function showNotification(message, type = 'info') {
-            const colors = {
-                'success': 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                'error': 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                'info': 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'
-            };
-            
-            const notification = document.createElement('div');
-            notification.className = 'notification';
-            notification.style.background = colors[type];
-            notification.style.color = 'white';
-            notification.style.border = '1px solid rgba(255, 255, 255, 0.2)';
-            
-            const icon = type === 'success' ? 'check-circle' : type === 'error' ? 'times-circle' : 'info-circle';
-            notification.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
-            
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.style.animation = 'slideOutRight 0.5s ease';
-                setTimeout(() => notification.remove(), 500);
-            }, 3000);
-        }
+    // Initialize systems
+    const particleSystem = new ParticleSystem();
 
-        // Auto-close popup after 10 seconds
+    // Close popup function
+    async function closePopup() {
+        const popup = document.getElementById('welcomePopup');
+        popup.style.animation = 'fadeOut 0.5s ease';
         setTimeout(() => {
-            const popup = document.getElementById('welcomePopup');
-            if (popup && popup.style.display !== 'none') {
-                closePopup();
-            }
-        }, 10000);
+            popup.style.display = 'none';
+        }, 500);
+        
+        currentStreamIndex = 0;
+        
+        // Initialize player with test stream
+        await initPlayer(config.streamUrls.fallback[currentLanguage][0]);
+    }
 
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            const video = document.getElementById('videoPlayer');
-            // Skip if YouTube is playing
-            if (currentLanguage === 'regional') return;
-            
-            switch(e.key) {
-                case ' ':
-                    e.preventDefault();
-                    if (video.paused) {
-                        video.play();
-                    } else {
-                        video.pause();
-                    }
-                    break;
-                case 'f':
-                    if (document.fullscreenElement) {
-                        document.exitFullscreen();
-                    } else {
-                        video.requestFullscreen();
-                    }
-                    break;
-                case 'ArrowRight':
-                    video.currentTime += 10;
-                    break;
-                case 'ArrowLeft':
-                    video.currentTime -= 10;
-                    break;
-                case 'ArrowUp':
-                    e.preventDefault();
-                    video.volume = Math.min(1, video.volume + 0.1);
-                    break;
-                case 'ArrowDown':
-                    e.preventDefault();
-                    video.volume = Math.max(0, video.volume - 0.1);
-                    break;
-            }
+    // Change language function
+    async function changeLanguage(language, button) {
+        currentLanguage = language;
+        currentStreamIndex = 0;
+        
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+            btn.classList.remove('active');
         });
+        button.classList.add('active');
+        
+        document.getElementById('loadingIndicator').style.display = 'block';
+        
+        let streamUrl;
+        if (language === 'regional') {
+            streamUrl = config.streamUrls.regional;
+        } else {
+            streamUrl = config.streamUrls.fallback[language][0];
+        }
+        
+        await initPlayer(streamUrl);
+        
+        console.log(`Switched to ${language} stream`);
+    }
 
-        // Double-click to fullscreen on video
-        document.getElementById('videoPlayer').addEventListener('dblclick', function() {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            } else {
-                this.requestFullscreen();
-            }
-        });
+    // Notification system (simplified - no UI notifications)
+    function showNotification(message, type = 'info') {
+        console.log(`[${type.toUpperCase()}] ${message}`);
+    }
 
-        // Connection status indicator
-        function updateConnectionStatus(isConnected) {
-            let statusElement = document.getElementById('connectionStatus');
-            if (!statusElement) {
-                statusElement = document.createElement('div');
-                statusElement.id = 'connectionStatus';
-                document.body.appendChild(statusElement);
-            }
-            
-            if (isConnected) {
-                statusElement.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.9), rgba(5, 150, 105, 0.9))';
-                statusElement.style.border = '1px solid rgba(16, 185, 129, 0.5)';
-                statusElement.innerHTML = '<i class="fas fa-check-circle"></i> Connected to live scores';
-            } else {
-                statusElement.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.9))';
-                statusElement.style.border = '1px solid rgba(239, 68, 68, 0.5)';
-                statusElement.innerHTML = '<i class="fas fa-exclamation-circle"></i> Connection lost';
-            }
-            
-            setTimeout(() => {
-                statusElement.style.opacity = '0';
-                setTimeout(() => {
-                    statusElement.style.opacity = '1';
-                    statusElement.remove();
-                }, 300);
-            }, 5000);
+    // Connection status (simplified - no UI updates)
+    function updateConnectionStatus(isConnected) {
+        console.log('Connection status:', isConnected ? 'Connected' : 'Disconnected');
+    }
+
+    // Initialize on load
+    window.addEventListener('load', async () => {
+        if (!window.shaka) {
+            console.error('Video player failed to load');
+            return;
         }
 
-        // Monitor online/offline status
-        window.addEventListener('online', () => {
-            updateConnectionStatus(true);
-            if (cricketScoreAPI) {
-                cricketScoreAPI.fetchCurrentScore();
-            }
-        });
+        // Install polyfills
+        shaka.polyfill.installAll();
+        
+        // Check for Shaka Player support
+        if (!shaka.Player.isBrowserSupported()) {
+            console.warn('Browser not fully supported');
+        }
+    });
 
-        window.addEventListener('offline', () => {
-            updateConnectionStatus(false);
-        });
-
-        // Check Python backend connection on load
-        window.addEventListener('DOMContentLoaded', async () => {
-            try {
-                const response = await fetch(`${config.backendUrl}/api/status`);
-                if (response.ok) {
-                                        console.log('Connected to Python backend successfully');
-                    const status = await response.json();
-                    if (status.has_data) {
-                        console.log('Backend has match data ready');
-                    } else {
-                        console.log('Backend is running but no match URL set yet');
-                        showNotification('Backend ready! Set match URL in Python app', 'info');
-                    }
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        // Refresh shortcut
+        if (e.key === 'r' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            refreshScores();
+        }
+        
+        const video = document.getElementById('videoPlayer');
+        if (currentLanguage === 'regional' || !video) return;
+        
+        switch(e.key.toLowerCase()) {
+            case ' ':
+                e.preventDefault();
+                video.paused ? video.play() : video.pause();
+                break;
+            case 'f':
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
                 } else {
-                    console.error('Python backend not responding properly');
-                    showNotification('Backend connection error. Make sure Python app is running!', 'error');
+                    video.requestFullscreen();
                 }
-            } catch (error) {
-                console.error('Cannot connect to Python backend:', error);
-                showNotification('Cannot connect to backend. Run python app.py first!', 'error');
-            }
-        });
-
-        // Add ripple effect on click
-        document.addEventListener('click', function(e) {
-            if (e.target.matches('.lang-btn, .refresh-btn, .team-score, .close-popup')) {
-                const ripple = document.createElement('span');
-                const rect = e.target.getBoundingClientRect();
-                const size = Math.max(rect.width, rect.height);
-                const x = e.clientX - rect.left - size / 2;
-                const y = e.clientY - rect.top - size / 2;
-                
-                ripple.style.cssText = `
-                    position: absolute;
-                    width: ${size}px;
-                    height: ${size}px;
-                    border-radius: 50%;
-                    background: rgba(99, 102, 241, 0.3);
-                    top: ${y}px;
-                    left: ${x}px;
-                    pointer-events: none;
-                    transform: scale(0);
-                    animation: ripple 0.6s ease-out;
-                `;
-                
-                e.target.style.position = 'relative';
-                e.target.style.overflow = 'hidden';
-                e.target.appendChild(ripple);
-                
-                setTimeout(() => ripple.remove(), 600);
-            }
-        });
-
-        // Add CSS for ripple animation
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes ripple {
-                to {
-                    transform: scale(4);
-                    opacity: 0;
-                }
-            }
-        `;
-        document.head.appendChild(style);
-
-        // Auto-resize video player based on window size
-        function resizeVideo() {
-            const video = document.getElementById('videoPlayer');
-            const youtubeContainer = document.getElementById('youtubeContainer');
-            const container = document.querySelector('.video-container');
-            
-            // Container already has aspect-ratio set in CSS
-            // Just ensure both players fill the container
-            video.style.width = '100%';
-            video.style.height = '100%';
-            youtubeContainer.style.width = '100%';
-            youtubeContainer.style.height = '100%';
+                break;
+            case 'arrowright':
+                video.currentTime += 10;
+                break;
+            case 'arrowleft':
+                video.currentTime -= 10;
+                break;
+            case 'arrowup':
+                e.preventDefault();
+                video.volume = Math.min(1, video.volume + 0.1);
+                break;
+            case 'arrowdown':
+                e.preventDefault();
+                video.volume = Math.max(0, video.volume - 0.1);
+                break;
         }
+    });
 
-        window.addEventListener('resize', resizeVideo);
-        resizeVideo();
-
-        // Add glow effect on hover for interactive elements
-        document.querySelectorAll('.team-score, .lang-btn, .refresh-btn').forEach(element => {
-            let mouseX = 0;
-            let mouseY = 0;
-            let rect = element.getBoundingClientRect();
-            
-            element.addEventListener('mousemove', (e) => {
-                rect = element.getBoundingClientRect();
-                mouseX = e.clientX - rect.left;
-                mouseY = e.clientY - rect.top;
-                
-                const centerX = rect.width / 2;
-                const centerY = rect.height / 2;
-                const distanceX = (mouseX - centerX) / centerX;
-                const distanceY = (mouseY - centerY) / centerY;
-                
-                element.style.transform = `
-                    perspective(1000px) 
-                    rotateY(${distanceX * 5}deg) 
-                    rotateX(${-distanceY * 5}deg)
-                    translateZ(10px)
-                `;
-            });
-            
-            element.addEventListener('mouseleave', () => {
-                element.style.transform = '';
-            });
-        });
-
-        // Performance optimization: Debounce resize events
-        let resizeTimer;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(resizeVideo, 250);
-        });
-
-        // Add smooth scroll behavior
-        document.documentElement.style.scrollBehavior = 'smooth';
-
-        // Interactive background effect
-        document.addEventListener('mousemove', (e) => {
-            const x = e.clientX / window.innerWidth;
-            const y = e.clientY / window.innerHeight;
-            
-            document.body.style.background = `
-                radial-gradient(
-                    600px at ${x * 100}% ${y * 100}%,
-                    rgba(99, 102, 241, 0.15),
-                    transparent 40%
-                ),
-                var(--bg)
-            `;
-        });
-
-        // Create floating orbs in background
-        function createFloatingOrb() {
-            const orb = document.createElement('div');
-            orb.style.cssText = `
-                position: fixed;
-                width: ${Math.random() * 300 + 100}px;
-                height: ${Math.random() * 300 + 100}px;
-                background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
-                border-radius: 50%;
-                left: ${Math.random() * window.innerWidth}px;
-                top: ${Math.random() * window.innerHeight}px;
-                pointer-events: none;
-                z-index: 0;
-                filter: blur(40px);
-                opacity: 0;
-                animation: floatOrb 20s ease-in-out infinite;
-                animation-delay: ${Math.random() * 5}s;
-            `;
-            
-            document.body.appendChild(orb);
-            
-            // Clean up old orbs
-            setTimeout(() => orb.remove(), 20000);
+    // Double-click fullscreen
+    document.getElementById('videoPlayer').addEventListener('dblclick', function() {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else {
+            this.requestFullscreen();
         }
+    });
 
-        // Add floating orbs animation
-        const orbStyle = document.createElement('style');
-        orbStyle.textContent = `
-            @keyframes floatOrb {
-                0% {
-                    opacity: 0;
-                    transform: translateY(100px) scale(0);
-                }
-                20% {
-                    opacity: 1;
-                    transform: translateY(0) scale(1);
-                }
-                80% {
-                    opacity: 1;
-                    transform: translateY(-100px) scale(1);
-                }
-                100% {
-                    opacity: 0;
-                    transform: translateY(-200px) scale(0.5);
-                }
-            }
-        `;
-        document.head.appendChild(orbStyle);
-
-        // Create initial orbs
-        for (let i = 0; i < 5; i++) {
-            setTimeout(createFloatingOrb, i * 1000);
-        }
-
-        // Continue creating orbs periodically
-        setInterval(createFloatingOrb, 4000);
-
-        // Handle visibility change to pause/resume updates
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                // Pause updates when page is not visible
-                if (cricketScoreAPI) {
-                    cricketScoreAPI.stopUpdates();
-                }
-            } else {
-                // Resume updates when page becomes visible
-                if (cricketScoreAPI) {
-                    cricketScoreAPI.startLiveUpdates();
-                }
-            }
-        });
-
-        // Error boundary for graceful error handling
-        window.addEventListener('error', (event) => {
-            console.error('Global error:', event.error);
-            showNotification('An error occurred. Please refresh the page.', 'error');
-        });
-
-        // Clean up when page closes
-        window.addEventListener('beforeunload', () => {
+    // Handle visibility change
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
             if (cricketScoreAPI) {
                 cricketScoreAPI.stopUpdates();
             }
-            if (hls) {
-                hls.destroy();
+        } else {
+            if (cricketScoreAPI) {
+                cricketScoreAPI.startLiveUpdates();
             }
-        });
+        }
+    });
 
-        // Add popup entrance animation
-        window.addEventListener('load', () => {
-            const popup = document.querySelector('.popup-content');
-            if (popup) {
-                // Create additional floating particles in popup
-                for (let i = 0; i < 20; i++) {
-                    const particle = document.createElement('div');
-                    particle.style.cssText = `
-                        position: absolute;
-                        width: 4px;
-                        height: 4px;
-                        background: var(--accent);
-                        border-radius: 50%;
-                        left: ${Math.random() * 100}%;
-                        top: ${Math.random() * 100}%;
-                        pointer-events: none;
-                        opacity: 0.6;
-                        animation: float ${3 + Math.random() * 4}s ease-in-out infinite;
-                        animation-delay: ${Math.random() * 2}s;
-                    `;
-                    popup.appendChild(particle);
-                }
-            }
-        });
+    // Monitor network status
+    window.addEventListener('online', () => {
+        console.log('Network: Online');
+        if (cricketScoreAPI) {
+            cricketScoreAPI.fetchCurrentScore();
+        }
+    });
 
-        // Add float animation for popup particles
-        const floatStyle = document.createElement('style');
-        floatStyle.textContent = `
-            @keyframes float {
-                0%, 100% {
-                    transform: translateY(0) translateX(0);
-                    opacity: 0.6;
-                }
-                50% {
-                    transform: translateY(-20px) translateX(10px);
-                    opacity: 1;
-                }
-            }
-        `;
-        document.head.appendChild(floatStyle);
+    window.addEventListener('offline', () => {
+        console.log('Network: Offline');
+    });
 
-        // Prevent right-click on YouTube iframe to hide context menu
-        document.addEventListener('contextmenu', function(e) {
-            if (e.target.id === 'youtubePlayer' || e.target.className === 'youtube-overlay') {
-                e.preventDefault();
-                return false;
-            }
-        });
-    </script>
+    // Auto-close popup
+    setTimeout(() => {
+        const popup = document.getElementById('welcomePopup');
+        if (popup && popup.style.display !== 'none') {
+            closePopup();
+        }
+    }, 10000);
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', async () => {
+        if (cricketScoreAPI) {
+            cricketScoreAPI.stopUpdates();
+        }
+        if (player) {
+            await player.destroy();
+        }
+        if (qualityInterval) {
+            clearInterval(qualityInterval);
+        }
+    });
+
+        // Error handler
+    window.addEventListener('error', (event) => {
+        console.error('Global error:', event.error);
+    });
+
+    // Prevent right-click on video controls
+    document.addEventListener('contextmenu', (e) => {
+        if (e.target.id === 'youtubePlayer' || e.target.className === 'youtube-overlay') {
+            e.preventDefault();
+            return false;
+        }
+    });
+
+    // Debug functions for testing
+    window.debugStream = function() {
+        console.group('🔧 Debug Info');
+        console.log('Backend URL:', config.backendUrl);
+        console.log('Shaka Player Supported:', shaka && shaka.Player.isBrowserSupported());
+        console.log('Current Language:', currentLanguage);
+        console.log('Stream Index:', currentStreamIndex);
+        
+        if (player) {
+            console.log('Player Stats:', player.getStats());
+            console.log('Buffered:', player.getBufferedInfo());
+            const tracks = player.getVariantTracks();
+            console.log('Available Tracks:', tracks);
+            console.log('Active Track:', tracks.find(t => t.active));
+        }
+        console.groupEnd();
+    };
+
+    window.testStream = async function(url) {
+        console.log('Testing stream:', url);
+        try {
+            currentStreamIndex = 0;
+            await initPlayer(url);
+            console.log('Stream test successful!');
+        } catch (error) {
+            console.error('Stream test failed:', error);
+        }
+    };
+
+    // Mobile optimizations
+    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        // Disable particles on mobile
+        document.getElementById('particles').style.display = 'none';
+        
+        // Add mobile-specific video attributes
+        const video = document.getElementById('videoPlayer');
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
+        
+        console.log('Mobile optimizations applied');
+    }
+
+    console.log('🏏 Cricket Live Streaming App Ready!');
+    console.log('💡 Use window.debugStream() for debugging');
+    console.log('💡 Use window.testStream(url) to test streams');
+</script>
 </body>
 </html>
