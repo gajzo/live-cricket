@@ -366,7 +366,7 @@
             margin-bottom: 4px;
         }
 
-        .last-update {
+                .last-update {
             font-size: 0.875rem;
             color: var(--text-dim);
             opacity: 0.8;
@@ -685,7 +685,7 @@
             background: var(--surface);
         }
 
-        .lang-btn.active {
+                .lang-btn.active {
             background: var(--accent);
             border-color: transparent;
             box-shadow: 0 10px 30px var(--glow);
@@ -1022,7 +1022,7 @@
             </button>
         </div>
 
-        <!-- Video Player -->
+                <!-- Video Player -->
         <div class="video-container">
             <!-- Stream Quality Info -->
             <div class="quality-info" id="qualityInfo" style="display: none;">
@@ -1040,7 +1040,7 @@
                 </div>
             </div>
             
-            <video id="videoPlayer" controls crossorigin="anonymous"></video>
+            <video id="videoPlayer" controls></video>
             <div class="youtube-container" id="youtubeContainer">
                 <iframe id="youtubePlayer" 
                         src="" 
@@ -1058,43 +1058,41 @@
     </div>
 
    <script>
-    // Configuration with proper deployment support
+    // Configuration
     const config = {
         backendUrl: (() => {
             const hostname = window.location.hostname;
-            const protocol = window.location.protocol;
             
-            // Local development
             if (hostname === 'localhost' || hostname === '127.0.0.1') {
                 return 'http://localhost:5000';
             }
             
-            // File protocol (opening HTML file directly)
-            if (protocol === 'file:') {
+            if (window.location.protocol === 'file:') {
                 return 'http://localhost:5000';
             }
             
-            // Production - Replace with your actual backend URL
-            if (hostname.includes('pages.dev') || hostname.includes('netlify.app') || hostname.includes('vercel.app')) {
-                // Replace this URL with your deployed backend URL
-                return 'https://your-backend-domain.onrender.com';
-            }
-            
-            // Fallback
-            return `${protocol}//${hostname}:5000`;
+            // Update this to your actual backend URL when deployed
+            return 'https://your-python-backend.onrender.com';
         })(),
         
-        // Working streaming URLs with better deployment compatibility
         streamUrls: {
-            english: [
-                // Public test streams that work without CORS issues
-                'https://in-mc-fdlive.fancode.com/mumbai/137075_english_hls_ccd31b8b6288331ta-di_h264/1080p.m3u8',
-                
-            ],
-            hindi: [
-                'https://livesim.dashif.org/livesim/chunkdur_1/ato_7/testpic4_8s/Manifest.mpd',
-                
-            ],
+            // These are test streams that should work
+            english: 'https://in-mc-fdlive.fancode.com/mumbai/137075_english_hls_ccd31b8b6288331ta-di_h264/1080p.m3u8',
+            hindi: 'https://sundirectgo-live.pc.cdn.bitgravity.com/hd21/video-stream-1_SD_DRM-2-init.mp4',
+            
+            // Alternative working streams
+            fallback: {
+                english: [
+                    'https://in-mc-fdlive.fancode.com/mumbai/137075_english_hls_ccd31b8b6288331ta-di_h264/1080p.m3u8',
+                    'https://sundirectgo-live.pc.cdn.bitgravity.com/hd21/video-stream-1_SD_DRM-2-init.mp4',
+                    'https://sundirectgo-live.pc.cdn.bitgravity.com/hd21/dth.mpd'
+                ],
+                hindi: [
+                    'https://livesim.dashif.org/livesim/chunkdur_1/ato_7/testpic4_8s/Manifest.mpd',
+                    'https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd'
+                ]
+            },
+            
             regional: 'https://www.youtube.com/embed/GoHDolSJxIQ'
         }
     };
@@ -1106,37 +1104,9 @@
     let qualityInterval = null;
     let currentStreamIndex = 0;
 
-    // Enhanced error handling for deployment
-    const deploymentFixes = {
-        // CORS proxy for problematic streams
-        corsProxy: (url) => {
-            if (url.includes('fancode.com') || url.includes('sundirectgo')) {
-                // For production, you might need a CORS proxy
-                return `https://cors-anywhere.herokuapp.com/${url}`;
-            }
-            return url;
-        },
-        
-        // Check if stream is accessible
-        checkStreamAccess: async (url) => {
-            try {
-                const response = await fetch(url, { 
-                    method: 'HEAD',
-                    mode: 'cors',
-                    signal: AbortSignal.timeout(5000)
-                });
-                return response.ok;
-            } catch (error) {
-                console.log('Stream accessibility check failed:', error);
-                return false;
-            }
-        }
-    };
-
     // Start cricket score updates immediately on page load
     window.addEventListener('DOMContentLoaded', async () => {
-        console.log(`Backend URL: ${config.backendUrl}`);
-        console.log(`Deployment environment: ${window.location.hostname}`);
+        console.log(`Checking backend at: ${config.backendUrl}`);
         
         // Initialize cricket score API immediately
         cricketScoreAPI = new CricketScoreAPI();
@@ -1155,24 +1125,23 @@
             if (response.ok) {
                 console.log('Backend connected successfully');
                 const status = await response.json();
+                // Removed notification - just log it
                 if (!status.has_data) {
                     console.log('No match data available yet');
                 }
             }
         } catch (error) {
-            console.warn('Backend not available, using local data:', error.message);
-            // Continue without backend
+            console.warn('Backend not available:', error);
+            // Removed notification - just log it
         }
     });
 
-    // Enhanced Shaka Player initialization with deployment fixes
+    // Fixed Shaka Player initialization
     async function initPlayer(url) {
         const video = document.getElementById('videoPlayer');
         const youtubeContainer = document.getElementById('youtubeContainer');
         const youtube = document.getElementById('youtubePlayer');
         const loadingIndicator = document.getElementById('loadingIndicator');
-
-        console.log('Initializing player with URL:', url);
 
         // Handle YouTube for regional
         if (currentLanguage === 'regional') {
@@ -1194,7 +1163,7 @@
             return;
         }
 
-        // Handle DASH/HLS/MP4 streams
+        // Handle DASH/HLS streams
         video.style.display = 'block';
         youtubeContainer.style.display = 'none';
         youtube.src = '';
@@ -1203,7 +1172,7 @@
             // Check browser support
             if (!shaka.Player.isBrowserSupported()) {
                 console.error('Browser does not support Shaka Player');
-                throw new Error('Browser not supported for advanced streaming');
+                throw new Error('Browser does not support required streaming formats');
             }
 
             // Destroy existing player if any
@@ -1212,44 +1181,29 @@
                 player = null;
             }
 
-            // Check if it's a regular MP4 file
-            if (url.includes('.mp4')) {
-                console.log('Loading MP4 file directly');
-                video.src = url;
-                loadingIndicator.style.display = 'none';
-                
-                video.addEventListener('loadstart', () => {
-                    console.log('MP4 loading started');
-                });
-                
-                video.addEventListener('canplay', () => {
-                    console.log('MP4 can play');
-                    try {
-                        video.play();
-                    } catch (e) {
-                        console.log('Autoplay prevented for MP4');
-                    }
-                });
-                
-                video.addEventListener('error', (e) => {
-                    console.error('MP4 playback error:', e);
-                    handleStreamError(e);
-                });
-                
-                return;
-            }
-
-            // Create new Shaka player for DASH/HLS
+            // Create new player using attach method (new way)
             player = new shaka.Player();
             await player.attach(video);
             
-            // Enhanced configuration for deployment
+            // Configure player with robustness levels
             player.configure({
                 drm: {
-                    servers: {},
-                    advanced: {},
+                    servers: {
+                        'com.widevine.alpha': '',
+                        'com.microsoft.playready': ''
+                    },
+                    advanced: {
+                        'com.widevine.alpha': {
+                            'videoRobustness': 'SW_SECURE_CRYPTO',
+                            'audioRobustness': 'SW_SECURE_CRYPTO'
+                        },
+                        'com.microsoft.playready': {
+                            'videoRobustness': 'SW_SECURE_CRYPTO',
+                            'audioRobustness': 'SW_SECURE_CRYPTO'
+                        }
+                    },
                     retryParameters: {
-                        timeout: 15000,
+                        timeout: 10000,
                         maxAttempts: 3,
                         baseDelay: 1000,
                         backoffFactor: 2,
@@ -1257,45 +1211,35 @@
                     }
                 },
                 streaming: {
-                    bufferingGoal: 20,
-                    rebufferingGoal: 10,
-                    bufferBehind: 20,
+                    bufferingGoal: 30,
+                    rebufferingGoal: 15,
+                    bufferBehind: 30,
                     retryParameters: {
                         timeout: 30000,
-                        maxAttempts: 4,
+                        maxAttempts: 5,
                         baseDelay: 1000,
                         backoffFactor: 2,
                         fuzzFactor: 0.5
-                    },
-                    // Enable low latency mode for live streams
-                    lowLatencyMode: false,
-                    autoLowLatencyMode: false
+                    }
                 },
                 manifest: {
                     retryParameters: {
                         timeout: 30000,
-                        maxAttempts: 4,
+                        maxAttempts: 5,
                         baseDelay: 1000,
                         backoffFactor: 2,
                         fuzzFactor: 0.5
                     },
                     dash: {
                         clockSyncUri: '',
-                        ignoreDrmInfo: false,
+                        ignoreDrmInfo: true,
                         xlinkFailGracefully: true,
                         autoCorrectDrift: true
-                    },
-                    hls: {
-                        useFullSegmentsForStartTime: true,
-                        ignoreManifestTimestampsInSegmentsMode: false
                     }
                 },
                 abr: {
                     enabled: true,
-                    defaultBandwidthEstimate: 1000000,
-                    switchInterval: 8,
-                    bandwidthUpgradeTarget: 0.85,
-                    bandwidthDowngradeTarget: 0.95
+                    defaultBandwidthEstimate: 2000000
                 }
             });
 
@@ -1304,30 +1248,22 @@
             player.addEventListener('buffering', onBuffering);
             player.addEventListener('adaptation', onAdaptation);
             
-            // Enhanced network filtering for deployment
+            // Configure network filters for CORS
             player.getNetworkingEngine().registerRequestFilter((type, request) => {
-                // Remove headers that might cause CORS issues
-                delete request.headers['Origin'];
-                delete request.headers['Referer'];
-                
-                // Add necessary headers for some streams
+                // Add necessary headers
                 if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST ||
                     type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
-                    
                     request.allowCrossSiteCredentials = false;
-                    
-                    // Add User-Agent for some streams
-                    request.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
+                    // Don't send custom headers that might trigger CORS preflight
+                    delete request.headers['Origin'];
+                    delete request.headers['Referer'];
                 }
             });
 
             console.log('Attempting to load stream:', url);
             
-            // Apply CORS proxy if needed (for production)
-            const streamUrl = deploymentFixes.corsProxy(url);
-            
             // Try to load the stream
-            await player.load(streamUrl);
+            await player.load(url);
             
             console.log('Stream loaded successfully');
             loadingIndicator.style.display = 'none';
@@ -1338,70 +1274,46 @@
             // Try to auto-play
             try {
                 await video.play();
-                console.log('Autoplay successful');
             } catch (e) {
                 console.log('Autoplay prevented, user interaction required');
-                // Show play button or message
-                showPlayButton();
+                // Removed notification
             }
 
         } catch (error) {
             console.error('Error loading stream:', error);
+            
+            if (error.code === 6012) {
+                console.log('Stream access denied. Trying alternative source...');
+            }
+            
+            // Try fallback streams
             await handleStreamError(error);
         }
     }
 
-    // Show play button when autoplay fails
-    function showPlayButton() {
-        const video = document.getElementById('videoPlayer');
-        const playButton = document.createElement('button');
-        playButton.innerHTML = '<i class="fas fa-play"></i> Click to Play';
-        playButton.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: var(--accent);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 50px;
-            font-size: 1.2rem;
-            cursor: pointer;
-            z-index: 100;
-        `;
-        
-        playButton.onclick = () => {
-            video.play();
-            playButton.remove();
-        };
-        
-        document.querySelector('.video-container').appendChild(playButton);
-    }
-
-    // Enhanced error handling for deployment
+        // Player event handlers
     function onPlayerError(error) {
-        console.error('Player error:', error.detail);
+        console.error('Player error', error.detail);
         
         const errorMessages = {
-            1001: 'Stream not found - trying alternative source',
+            1001: 'Stream not found',
             1002: 'Network connection error',
             1003: 'Stream decode error',
-            3016: 'No supported stream format - switching to MP4',
-            4000: 'Stream requires authentication',
+            3016: 'No supported stream format',
+            4000: 'Stream authentication required',
             6001: 'License server error',
-            6012: 'Network access denied - using fallback stream',
-            6013: 'Network timeout - trying next stream',
+            6012: 'Network request failed - possible CORS/access issue',
+            6013: 'Network timeout',
             7000: 'Storage error'
         };
         
-        const message = errorMessages[error.detail.code] || 'Stream error - switching source';
-        console.log('Stream error:', message);
+        const message = errorMessages[error.detail.code] || 'Stream error';
+        console.log('Stream error:', message); // Just log instead of showing notification
         
-        // Auto-recover by trying next stream
-        setTimeout(() => {
+        // Only try to recover from non-fatal errors
+        if (error.detail.severity !== shaka.util.Error.Severity.CRITICAL) {
             handleStreamError(error.detail);
-        }, 1000);
+        }
     }
 
     function onBuffering(buffering) {
@@ -1425,93 +1337,48 @@
         }
     }
 
-    // Enhanced stream error handling with better fallback logic
+    // Stream error handling with working fallbacks
     async function handleStreamError(error) {
-        console.log('Handling stream error, trying fallback streams...');
+        console.error('Handling stream error, trying fallback...');
         
-        const fallbackUrls = config.streamUrls[currentLanguage];
+        const fallbackUrls = config.streamUrls.fallback[currentLanguage];
         
-        if (Array.isArray(fallbackUrls) && currentStreamIndex < fallbackUrls.length - 1) {
+        if (fallbackUrls && currentStreamIndex < fallbackUrls.length - 1) {
             currentStreamIndex++;
             const fallbackUrl = fallbackUrls[currentStreamIndex];
             
-            console.log(`Trying fallback stream ${currentStreamIndex + 1}/${fallbackUrls.length}: ${fallbackUrl}`);
+            console.log(`Trying fallback stream ${currentStreamIndex + 1}/${fallbackUrls.length}`);
             
             try {
-                // Small delay before trying next stream
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                
                 if (player) {
                     await player.unload();
                 }
                 
-                await initPlayer(fallbackUrl);
-                console.log('Successfully switched to backup stream');
+                // Small delay before trying next stream
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 
+                await initPlayer(fallbackUrl);
+                console.log('Switched to backup stream');
             } catch (e) {
                 console.error('Fallback stream failed:', e);
                 // Try next fallback
-                if (currentStreamIndex < fallbackUrls.length - 1) {
-                    await handleStreamError(e);
-                } else {
-                    showStreamError();
-                }
+                await handleStreamError(e);
             }
         } else {
-            showStreamError();
+            document.getElementById('loadingIndicator').innerHTML = 
+                '<p style="color: #ef4444;">Unable to load streams. Please check your connection or try again later.</p>';
+            console.error('All streams failed');
         }
     }
-
-    // Show user-friendly error message
-    function showStreamError() {
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        loadingIndicator.innerHTML = `
-            <div style="text-align: center; padding: 40px;">
-                <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: #ef4444; margin-bottom: 20px;"></i>
-                <h3 style="color: #ef4444; margin-bottom: 15px;">Stream Unavailable</h3>
-                <p style="color: var(--text-dim); margin-bottom: 25px;">
-                    Unable to load the live stream. This might be due to:
-                </p>
-                <ul style="color: var(--text-dim); text-align: left; margin-bottom: 25px;">
-                    <li>Network connectivity issues</li>
-                    <li>Stream source restrictions</li>
-                    <li>Geographic limitations</li>
-                </ul>
-                <button onclick="retryStream()" style="
-                    background: var(--accent); 
-                    color: white; 
-                    border: none; 
-                    padding: 12px 24px; 
-                    border-radius: 8px; 
-                    cursor: pointer;
-                    font-size: 1rem;
-                ">
-                    <i class="fas fa-refresh"></i> Try Again
-                </button>
-            </div>
-        `;
-    }
-
-    // Retry stream function
-    window.retryStream = async () => {
-        currentStreamIndex = 0;
-        document.getElementById('loadingIndicator').innerHTML = `
-            <div class="loading-spinner"></div>
-            <p style="margin-top: 20px; opacity: 0.8;">Retrying stream...</p>
-        `;
-        
-        await initPlayer(config.streamUrls[currentLanguage][0]);
-    };
 
     // Quality monitoring
     function startQualityMonitoring() {
         document.getElementById('qualityInfo').style.display = 'flex';
         
         qualityInterval = setInterval(() => {
-            const video = document.getElementById('videoPlayer');
-            
             if (player && player.getStats) {
                 const stats = player.getStats();
+                const video = document.getElementById('videoPlayer');
                 
                 // Update bandwidth
                 const bandwidth = (stats.estimatedBandwidth / 1e6).toFixed(2);
@@ -1521,17 +1388,11 @@
                 const bufferedEnd = video.buffered.length > 0 ? video.buffered.end(0) : 0;
                 const bufferTime = (bufferedEnd - video.currentTime).toFixed(1);
                 document.getElementById('streamBuffer').textContent = Math.max(0, bufferTime) + 's';
-            } else if (video.src) {
-                // For MP4 streams, show basic info
-                document.getElementById('streamBandwidth').textContent = 'MP4';
-                const bufferedEnd = video.buffered.length > 0 ? video.buffered.end(0) : 0;
-                const bufferTime = (bufferedEnd - video.currentTime).toFixed(1);
-                document.getElementById('streamBuffer').textContent = Math.max(0, bufferTime) + 's';
             }
         }, 2000);
     }
 
-    // Cricket Score API Class (unchanged)
+    // Cricket Score API Class
     class CricketScoreAPI {
         constructor() {
             this.backendUrl = config.backendUrl;
@@ -1549,8 +1410,7 @@
                         'Content-Type': 'application/json',
                     },
                     credentials: 'include',
-                    mode: 'cors',
-                    signal: AbortSignal.timeout(10000)
+                    mode: 'cors'
                 });
                 
                 const data = await response.json();
@@ -1567,8 +1427,8 @@
                 this.errorCount++;
                 
                 if (error.message === 'Failed to fetch') {
-                    console.error('Cannot reach backend. Using sample data.');
-                    this.showSampleData();
+                    console.error('Cannot reach backend. Make sure Python app is running.');
+                    document.getElementById('matchStatus').textContent = 'Score service unavailable';
                 }
                 
                 if (this.errorCount >= this.maxErrors) {
@@ -1577,33 +1437,6 @@
                 
                 return null;
             }
-        }
-
-        // Show sample data when backend is not available
-        showSampleData() {
-            const sampleData = {
-                team1_name: 'Team A',
-                team2_name: 'Team B',
-                team1_score: '245',
-                team1_wickets: '6',
-                team1_overs: '35.4',
-                team2_score: '0',
-                team2_wickets: '0',
-                team2_overs: '0.0',
-                team2_status: 'Yet to bat',
-                update: 'Live Match - Sample Data',
-                batterone: 'Player 1',
-                battertwo: 'Player 2',
-                batsmanonerun: '45',
-                batsmanoneball: '(32)',
-                batsmanonesr: '140.62',
-                batsmantworun: '23',
-                batsmantwoball: '(18)',
-                batsmantwosr: '127.78'
-            };
-            
-            this.updateDisplay(sampleData);
-            document.getElementById('matchStatus').textContent = 'Sample Data - Backend Unavailable';
         }
 
         updateDisplay(data) {
@@ -1705,7 +1538,7 @@
                 document.getElementById('targetSection').style.display = 'none';
             }
 
-            // Update batsmen information
+                        // Update batsmen information
             const batsman1Name = data.batterone || null;
             const batsman2Name = data.battertwo || null;
 
@@ -1757,7 +1590,7 @@
             
             this.updateInterval = setInterval(() => {
                 this.fetchCurrentScore();
-            }, 15000); // Increased interval for deployment
+            }, 10000);
         }
 
         stopUpdates() {
@@ -1768,7 +1601,30 @@
         }
     }
 
-    // Enhanced refresh function with deployment support
+    // Add smooth score transitions
+    function animateScoreChange(element, newValue) {
+        const currentValue = parseInt(element.textContent) || 0;
+        const difference = newValue - currentValue;
+        
+        if (difference === 0) return;
+        
+        const duration = 500;
+        const steps = 20;
+        const stepValue = difference / steps;
+        let currentStep = 0;
+        
+        const interval = setInterval(() => {
+            currentStep++;
+            if (currentStep <= steps) {
+                element.textContent = Math.round(currentValue + (stepValue * currentStep));
+            } else {
+                clearInterval(interval);
+                element.textContent = newValue;
+            }
+        }, duration / steps);
+    }
+
+    // Enhanced refresh function with better feedback
     async function refreshScores() {
         const refreshBtn = document.querySelector('.refresh-btn');
         const originalContent = refreshBtn.innerHTML;
@@ -1783,8 +1639,7 @@
                 headers: {
                     'Accept': 'application/json',
                 },
-                mode: 'cors',
-                signal: AbortSignal.timeout(15000)
+                mode: 'cors'
             });
             
             if (response.ok) {
@@ -1811,8 +1666,7 @@
                 throw new Error('Failed to refresh');
             }
         } catch (error) {
-            console.log('Failed to refresh scores, using cached data');
-            // Don't show error to user, just log it
+            console.error('Failed to refresh scores');
         } finally {
             // Reset button
             setTimeout(() => {
@@ -1822,7 +1676,7 @@
         }
     }
 
-    // Particle system (simplified for deployment)
+    // Reduced particle system
     class ParticleSystem {
         constructor() {
             this.container = document.getElementById('particles');
@@ -1830,14 +1684,13 @@
         }
 
         init() {
-            // Disable on mobile and slow connections for better performance
+            // Disable on mobile for better performance
             if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
                 return;
             }
-            
-            // Reduce frequency for deployment
+
             document.addEventListener('mousemove', (e) => {
-                if (Math.random() > 0.98) { // Reduced frequency
+                if (Math.random() > 0.95) {
                     this.createParticle(e.clientX, e.clientY);
                 }
             });
@@ -1868,11 +1721,11 @@
         
         currentStreamIndex = 0;
         
-        // Initialize player with first working stream
-        await initPlayer(config.streamUrls[currentLanguage][0]);
+        // Initialize player with test stream
+        await initPlayer(config.streamUrls.fallback[currentLanguage][0]);
     }
 
-    // Change language function with better error handling
+    // Change language function
     async function changeLanguage(language, button) {
         currentLanguage = language;
         currentStreamIndex = 0;
@@ -1883,62 +1736,33 @@
         button.classList.add('active');
         
         document.getElementById('loadingIndicator').style.display = 'block';
-        document.getElementById('loadingIndicator').innerHTML = `
-            <div class="loading-spinner"></div>
-            <p style="margin-top: 20px; opacity: 0.8;">Switching to ${language} stream...</p>
-        `;
         
         let streamUrl;
         if (language === 'regional') {
             streamUrl = config.streamUrls.regional;
         } else {
-            streamUrl = config.streamUrls[language][0];
+            streamUrl = config.streamUrls.fallback[language][0];
         }
         
-        try {
-            await initPlayer(streamUrl);
-            console.log(`Successfully switched to ${language} stream`);
-        } catch (error) {
-            console.error(`Failed to switch to ${language}:`, error);
-            // Try to fallback to a working stream
-            if (language !== 'english') {
-                currentLanguage = 'english';
-                await initPlayer(config.streamUrls.english[0]);
-            }
-        }
+        await initPlayer(streamUrl);
+        
+        console.log(`Switched to ${language} stream`);
     }
 
-    // Simplified notification system for deployment
+    // Notification system (simplified - no UI notifications)
     function showNotification(message, type = 'info') {
         console.log(`[${type.toUpperCase()}] ${message}`);
-        // Only show critical errors to user
-        if (type === 'error') {
-            const notification = document.createElement('div');
-            notification.className = 'notification';
-            notification.style.background = '#ef4444';
-            notification.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
-            document.body.appendChild(notification);
-            setTimeout(() => notification.remove(), 5000);
-        }
     }
 
-    // Connection status (simplified)
+    // Connection status (simplified - no UI updates)
     function updateConnectionStatus(isConnected) {
         console.log('Connection status:', isConnected ? 'Connected' : 'Disconnected');
-        if (!isConnected) {
-            document.getElementById('matchStatus').textContent = 'Connection issues - using cached data';
-        }
     }
 
-    // Initialize on load with deployment support
+    // Initialize on load
     window.addEventListener('load', async () => {
-        console.log('App loading...');
-        console.log('User Agent:', navigator.userAgent);
-        console.log('Connection:', navigator.connection ? navigator.connection.effectiveType : 'Unknown');
-        
         if (!window.shaka) {
-            console.error('Shaka Player failed to load');
-            showNotification('Video player failed to load', 'error');
+            console.error('Video player failed to load');
             return;
         }
 
@@ -1947,13 +1771,11 @@
         
         // Check for Shaka Player support
         if (!shaka.Player.isBrowserSupported()) {
-            console.warn('Browser not fully supported, using basic playback');
+            console.warn('Browser not fully supported');
         }
-        
-        console.log('App ready!');
     });
 
-    // Enhanced keyboard shortcuts
+    // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
         // Refresh shortcut
         if (e.key === 'r' && (e.ctrlKey || e.metaKey)) {
@@ -1970,19 +1792,16 @@
                 video.paused ? video.play() : video.pause();
                 break;
             case 'f':
-                e.preventDefault();
                 if (document.fullscreenElement) {
                     document.exitFullscreen();
                 } else {
-                    video.requestFullscreen().catch(console.log);
+                    video.requestFullscreen();
                 }
                 break;
             case 'arrowright':
-                e.preventDefault();
                 video.currentTime += 10;
                 break;
             case 'arrowleft':
-                e.preventDefault();
                 video.currentTime -= 10;
                 break;
             case 'arrowup':
@@ -1996,25 +1815,20 @@
         }
     });
 
-    // Double-click fullscreen with error handling
+    // Double-click fullscreen
     document.getElementById('videoPlayer').addEventListener('dblclick', function() {
         if (document.fullscreenElement) {
-            document.exitFullscreen().catch(console.log);
+            document.exitFullscreen();
         } else {
-            this.requestFullscreen().catch(console.log);
+            this.requestFullscreen();
         }
     });
 
-    // Handle visibility change with deployment considerations
+    // Handle visibility change
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
             if (cricketScoreAPI) {
                 cricketScoreAPI.stopUpdates();
-            }
-            // Pause video if playing to save bandwidth
-            const video = document.getElementById('videoPlayer');
-            if (video && !video.paused) {
-                video.pause();
             }
         } else {
             if (cricketScoreAPI) {
@@ -2023,52 +1837,42 @@
         }
     });
 
-    // Monitor network status for deployment
+    // Monitor network status
     window.addEventListener('online', () => {
         console.log('Network: Online');
         if (cricketScoreAPI) {
             cricketScoreAPI.fetchCurrentScore();
         }
-        updateConnectionStatus(true);
     });
 
     window.addEventListener('offline', () => {
         console.log('Network: Offline');
-        updateConnectionStatus(false);
     });
 
-    // Auto-close popup with delay
+    // Auto-close popup
     setTimeout(() => {
         const popup = document.getElementById('welcomePopup');
         if (popup && popup.style.display !== 'none') {
             closePopup();
         }
-    }, 8000); // Reduced delay for deployment
+    }, 10000);
 
-    // Enhanced cleanup on page unload
+    // Cleanup on page unload
     window.addEventListener('beforeunload', async () => {
         if (cricketScoreAPI) {
             cricketScoreAPI.stopUpdates();
         }
         if (player) {
-            try {
-                await player.destroy();
-            } catch (e) {
-                console.log('Player cleanup error:', e);
-            }
+            await player.destroy();
         }
         if (qualityInterval) {
             clearInterval(qualityInterval);
         }
     });
 
-    // Global error handler for deployment
+        // Error handler
     window.addEventListener('error', (event) => {
         console.error('Global error:', event.error);
-        // Don't show all errors to users in production
-        if (event.error && event.error.message && event.error.message.includes('network')) {
-            console.log('Network error detected, continuing with fallback');
-        }
     });
 
     // Prevent right-click on video controls
@@ -2079,44 +1883,20 @@
         }
     });
 
-    // Mobile optimizations for deployment
-    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-        // Disable particles on mobile
-        document.getElementById('particles').style.display = 'none';
-        
-        // Add mobile-specific video attributes
-        const video = document.getElementById('videoPlayer');
-        video.setAttribute('playsinline', 'true');
-        video.setAttribute('webkit-playsinline', 'true');
-        
-        // Reduce quality monitoring frequency on mobile
-        if (qualityInterval) {
-            clearInterval(qualityInterval);
-        }
-        
-        console.log('Mobile optimizations applied');
-    }
-
-    // Debug functions for production troubleshooting
+    // Debug functions for testing
     window.debugStream = function() {
         console.group('🔧 Debug Info');
-        console.log('Environment:', window.location.hostname);
         console.log('Backend URL:', config.backendUrl);
         console.log('Shaka Player Supported:', shaka && shaka.Player.isBrowserSupported());
         console.log('Current Language:', currentLanguage);
         console.log('Stream Index:', currentStreamIndex);
-        console.log('Available Streams:', config.streamUrls);
         
         if (player) {
-            try {
-                console.log('Player Stats:', player.getStats());
-                console.log('Buffered:', player.getBufferedInfo());
-                const tracks = player.getVariantTracks();
-                console.log('Available Tracks:', tracks);
-                console.log('Active Track:', tracks.find(t => t.active));
-            } catch (e) {
-                console.log('Player debug info unavailable:', e);
-            }
+            console.log('Player Stats:', player.getStats());
+            console.log('Buffered:', player.getBufferedInfo());
+            const tracks = player.getVariantTracks();
+            console.log('Available Tracks:', tracks);
+            console.log('Active Track:', tracks.find(t => t.active));
         }
         console.groupEnd();
     };
@@ -2132,20 +1912,20 @@
         }
     };
 
-    // Performance monitoring for deployment
-    if ('PerformanceObserver' in window) {
-        const observer = new PerformanceObserver((list) => {
-            for (const entry of list.getEntries()) {
-                if (entry.entryType === 'navigation') {
-                    console.log(`Page load time: ${entry.loadEventEnd - entry.loadEventStart}ms`);
-                }
-            }
-        });
-        observer.observe({entryTypes: ['navigation']});
+    // Mobile optimizations
+    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        // Disable particles on mobile
+        document.getElementById('particles').style.display = 'none';
+        
+        // Add mobile-specific video attributes
+        const video = document.getElementById('videoPlayer');
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
+        
+        console.log('Mobile optimizations applied');
     }
 
-    console.log('🏏 Cricket Live Streaming App Ready for Deployment!');
-    console.log(`🌍 Environment: ${window.location.hostname}`);
+    console.log('🏏 Cricket Live Streaming App Ready!');
     console.log('💡 Use window.debugStream() for debugging');
     console.log('💡 Use window.testStream(url) to test streams');
 </script>
