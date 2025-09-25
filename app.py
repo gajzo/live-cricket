@@ -145,31 +145,25 @@ if __name__ == '__main__':
             port=port,
             debug=False,
             use_reloader=False  # Never use reloader in production
-from flask import Flask, jsonify, request, render_template_string, send_from_directory, Response
+        )
+        from flask import Flask, jsonify, request, render_template_string, send_from_directory
 from flask_cors import CORS
 import requests
 from bs4 import BeautifulSoup
 import re
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
 import sys
-import json
-import logging
 
 app = Flask(__name__)
-
-# Configure logging for better debugging on Render
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 # Enhanced CORS configuration
 cors_config = {
     "origins": [
         "http://localhost:*",
         "http://127.0.0.1:*",
-        "https://gajju-trial1.onrender.com/",
+        "https://live-cricket-k3it.onrender.com",
         "https://*.onrender.com",
         "https://*.vercel.app",
         "https://*.netlify.app",
@@ -181,8 +175,7 @@ cors_config = {
         "Authorization",
         "Access-Control-Allow-Credentials",
         "Access-Control-Allow-Origin",
-        "Accept",
-        "Cache-Control"
+        "Accept"
     ],
     "supports_credentials": True,
     "max_age": 3600
@@ -193,10 +186,8 @@ CORS(app, resources={
     r"/api/*": cors_config,
     r"/": cors_config,
     r"/live": cors_config,
-    r"/test.html": cors_config,
-    r"/events": cors_config
+    r"/test.html": cors_config
 })
-
 # Add after_request handler for additional CORS headers
 @app.after_request
 def after_request(response):
@@ -216,7 +207,7 @@ def after_request(response):
         response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Accept, Cache-Control'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Accept'
     
     # For preflight requests
     if request.method == 'OPTIONS':
@@ -232,7 +223,6 @@ def after_request(response):
 @app.route('/api/set-url', methods=['OPTIONS'])
 @app.route('/api/debug', methods=['OPTIONS'])
 @app.route('/api/toggle-auto-update', methods=['OPTIONS'])
-@app.route('/events', methods=['OPTIONS'])
 def handle_preflight():
     return jsonify({'status': 'ok'}), 200
 
@@ -241,8 +231,6 @@ CURRENT_MATCH_URL = None
 MATCH_DATA = {}
 AUTO_UPDATE = True
 UPDATE_INTERVAL = 30  # seconds
-LAST_UPDATE_TIME = None
-ACTIVE_CONNECTIONS = set()  # Track active SSE connections
 
 class Colors:
     """Terminal colors"""
@@ -266,7 +254,6 @@ class CricketScraper:
     def scrape_crex_scores(self, match_url):
         """Scrape live scores from CREX"""
         try:
-            logger.info(f"Scraping URL: {match_url}")
             response = requests.get(match_url, headers=self.headers, timeout=10)
             soup = BeautifulSoup(response.text, 'html.parser')
             
@@ -278,11 +265,9 @@ class CricketScraper:
             data = self.parse_title_data(title_text)
             data['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            logger.info("Successfully scraped match data")
             return data
             
         except Exception as e:
-            logger.error(f"Error scraping: {str(e)}")
             print(f"{Colors.FAIL}Error scraping: {str(e)}{Colors.ENDC}")
             return None
 
@@ -443,7 +428,7 @@ class CricketScraper:
                         if team2_runs > 0:
                             target = team2_runs + 1
                             runs_needed = target - team1_runs
-                            overs_left = 20.0 - team1_overs
+                            overs_left = 50.0 - team1_overs
                             
                             if overs_left > 0 and runs_needed > 0:
                                 rrr = round(runs_needed / overs_left, 2)
@@ -477,99 +462,12 @@ class CricketScraper:
         except:
             return 0.0
 
-def should_update_data():
-    """Check if data should be updated based on time"""
-    global LAST_UPDATE_TIME
-    if not LAST_UPDATE_TIME:
-        return True
-    
-    time_diff = datetime.now() - LAST_UPDATE_TIME
-    return time_diff.seconds >= UPDATE_INTERVAL
-
-def update_match_data():
-    """Update match data and notify SSE clients"""
-    global CURRENT_MATCH_URL, MATCH_DATA, LAST_UPDATE_TIME, scraper
-    
-    if not CURRENT_MATCH_URL:
-        return False
-    
-    try:
-        logger.info("Updating match data...")
-        data = scraper.scrape_crex_scores(CURRENT_MATCH_URL)
-        if data:
-            MATCH_DATA = data
-            LAST_UPDATE_TIME = datetime.now()
-            print_match_update(data)
-            
-            # Notify SSE clients
-            notify_sse_clients(data)
-            logger.info("Match data updated successfully")
-            return True
-        else:
-            logger.error("Failed to scrape match data")
-            return False
-    except Exception as e:
-        logger.error(f"Error updating match data: {str(e)}")
-        return False
-
-def notify_sse_clients(data):
-    """Send updates to all SSE clients"""
-    global ACTIVE_CONNECTIONS
-    
-    # Remove closed connections
-    closed_connections = set()
-    for connection in ACTIVE_CONNECTIONS.copy():
-        try:
-            connection.put_nowait(f"data: {json.dumps(data)}\n\n")
-        except:
-            closed_connections.add(connection)
-    
-    # Clean up closed connections
-    ACTIVE_CONNECTIONS -= closed_connections
-
-# Server-Sent Events endpoint for real-time updates
-@app.route('/events')
-def events():
-    """Server-sent events endpoint for real-time score updates"""
-    def event_stream():
-        import queue
-        # Create a queue for this connection
-        q = queue.Queue()
-        ACTIVE_CONNECTIONS.add(q)
-        
-        try:
-            # Send initial data
-            if MATCH_DATA:
-                yield f"data: {json.dumps(MATCH_DATA)}\n\n"
-            
-            # Keep connection alive and send updates
-            while True:
-                try:
-                    # Wait for updates with timeout
-                    data = q.get(timeout=30)  # 30 second timeout
-                    yield data
-                except queue.Empty:
-                    # Send keepalive
-                    yield "data: {\"keepalive\": true}\n\n"
-                except:
-                    break
-        finally:
-            # Clean up
-            ACTIVE_CONNECTIONS.discard(q)
-    
-    return Response(event_stream(), mimetype='text/event-stream', headers={
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*'
-    })
-
-# HTML template for URL input page with SSE support
+# HTML template for URL input page (unchanged)
 URL_INPUT_PAGE = """
 <!DOCTYPE html>
 <html>
 <head>
     <title>Cricket Score Tracker - Control Panel</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         * {
             margin: 0;
@@ -635,7 +533,6 @@ URL_INPUT_PAGE = """
             cursor: pointer;
             transition: all 0.3s ease;
             margin-right: 10px;
-            margin-bottom: 10px;
         }
         
         button:hover {
@@ -704,32 +601,10 @@ URL_INPUT_PAGE = """
             margin-right: 10px;
         }
         
-        .connection-status {
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 15px;
-            text-align: center;
-        }
-        
-        .connected { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
-        .disconnected { background: rgba(231, 76, 60, 0.2); color: #e74c3c; }
-        
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }
             100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
-        }
-        
-        @media (max-width: 768px) {
-            .current-match {
-                grid-template-columns: 1fr;
-            }
-            
-            button {
-                width: 100%;
-                margin-bottom: 10px;
-                margin-right: 0;
-            }
         }
     </style>
 </head>
@@ -737,10 +612,6 @@ URL_INPUT_PAGE = """
     <div class="container">
         <div class="card">
             <h1>🏏 Cricket Score Tracker</h1>
-            
-            <div id="connectionStatus" class="connection-status disconnected">
-                🔴 Disconnected - Real-time updates not available
-            </div>
             
             <form onsubmit="setURL(event)">
                 <input type="url" id="matchUrl" placeholder="https://crex.com/scoreboard/..." required
@@ -758,17 +629,45 @@ URL_INPUT_PAGE = """
             <div id="status"></div>
         </div>
         
-        <div class="card" id="matchCard" style="{{ 'display: none;' if not (current_url and match_data) else '' }}">
+        {% if current_url and match_data %}
+        <div class="card">
             <h2><span class="live-indicator"></span>Current Match</h2>
-            <div class="current-match" id="currentMatchData">
-                <!-- Match data will be populated here -->
+            <div class="current-match">
+                <div class="stat-box">
+                    <div class="stat-label">{{ match_data.get('team1_name', 'Team 1') }}</div>
+                    <div class="stat-value">{{ match_data.get('team1_score', '0') }}-{{ match_data.get('team1_wickets', '0') }}</div>
+                    <div style="opacity: 0.8;">({{ match_data.get('team1_overs', '0') }} overs)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">{{ match_data.get('team2_name', 'Team 2') }}</div>
+                    {% if match_data.get('team2_status', 'Yet to bat') != 'Yet to bat' %}
+                        <div class="stat-value">{{ match_data.get('team2_score', '0') }}-{{ match_data.get('team2_wickets', '0') }}</div>
+                        <div style="opacity: 0.8;">({{ match_data.get('team2_overs', '0') }} overs)</div>
+                    {% else %}
+                        <div class="stat-value">Yet to bat</div>
+                    {% endif %}
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Run Rate</div>
+                    <div class="stat-value">{{ match_data.get('runrate', 'CRR: 0.00') }}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Last Update</div>
+                    <div class="stat-value">{{ match_data.get('timestamp', 'N/A') }}</div>
+                </div>
             </div>
             
-            <div class="stat-box" id="batsmenData" style="margin-top: 20px; display: none;">
+            {% if match_data.get('batterone', 'Batsman 1') != 'Batsman 1' %}
+            <div class="stat-box" style="margin-top: 20px;">
                 <h3 style="margin-bottom: 15px;">Current Batsmen</h3>
-                <div id="batsmenInfo"></div>
+                <p>🏏 {{ match_data.get('batterone') }}: {{ match_data.get('batsmanonerun') }} {{ match_data.get('batsmanoneball') }} SR: {{ match_data.get('batsmanonesr') }}</p>
+                {% if match_data.get('battertwo', 'Batsman 2') != 'Batsman 2' %}
+                <p>🏏 {{ match_data.get('battertwo') }}: {{ match_data.get('batsmantworun') }} {{ match_data.get('batsmantwoball') }} SR: {{ match_data.get('batsmantwosr') }}</p>
+                {% endif %}
             </div>
+            {% endif %}
         </div>
+        {% endif %}
         
         <div class="card">
             <h2>API Endpoints</h2>
@@ -779,112 +678,12 @@ URL_INPUT_PAGE = """
                 <div class="endpoint">POST /api/set-url - Set new match URL</div>
                 <div class="endpoint">GET /live - View live scores page</div>
                 <div class="endpoint">GET /api/debug - Debug information</div>
-                <div class="endpoint">GET /events - Server-Sent Events for real-time updates</div>
             </div>
         </div>
     </div>
     
     <script>
         let autoUpdate = {{ 'true' if auto_update else 'false' }};
-        let eventSource = null;
-        let reconnectAttempts = 0;
-        const maxReconnectAttempts = 5;
-        
-        // Initialize SSE connection
-        function initSSE() {
-            if (eventSource) {
-                eventSource.close();
-            }
-            
-            eventSource = new EventSource('/events');
-            
-            eventSource.onopen = function() {
-                console.log('SSE connected');
-                document.getElementById('connectionStatus').innerHTML = '🟢 Connected - Real-time updates active';
-                document.getElementById('connectionStatus').className = 'connection-status connected';
-                reconnectAttempts = 0;
-            };
-            
-            eventSource.onmessage = function(event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    if (!data.keepalive) {
-                        updateMatchDisplay(data);
-                    }
-                } catch (e) {
-                    console.error('Error parsing SSE data:', e);
-                }
-            };
-            
-            eventSource.onerror = function() {
-                console.error('SSE connection error');
-                document.getElementById('connectionStatus').innerHTML = '🟡 Reconnecting...';
-                document.getElementById('connectionStatus').className = 'connection-status info';
-                
-                eventSource.close();
-                
-                // Attempt to reconnect with exponential backoff
-                if (reconnectAttempts < maxReconnectAttempts) {
-                    setTimeout(() => {
-                        reconnectAttempts++;
-                        console.log(`Reconnection attempt ${reconnectAttempts}`);
-                        initSSE();
-                    }, Math.pow(2, reconnectAttempts) * 1000);
-                } else {
-                    document.getElementById('connectionStatus').innerHTML = '🔴 Connection failed - Using manual refresh only';
-                    document.getElementById('connectionStatus').className = 'connection-status disconnected';
-                }
-            };
-        }
-        
-        // Update match display with new data
-        function updateMatchDisplay(data) {
-            if (!data || data.team1_name === 'Team 1') return;
-            
-            const matchCard = document.getElementById('matchCard');
-            const matchData = document.getElementById('currentMatchData');
-            const batsmenData = document.getElementById('batsmenData');
-            const batsmenInfo = document.getElementById('batsmenInfo');
-            
-            // Show match card
-            matchCard.style.display = 'block';
-            
-            // Update match data
-            matchData.innerHTML = `
-                <div class="stat-box">
-                    <div class="stat-label">${data.team1_name || 'Team 1'}</div>
-                    <div class="stat-value">${data.team1_score || '0'}-${data.team1_wickets || '0'}</div>
-                    <div style="opacity: 0.8;">(${data.team1_overs || '0'} overs)</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">${data.team2_name || 'Team 2'}</div>
-                    ${data.team2_status !== 'Yet to bat' ? `
-                        <div class="stat-value">${data.team2_score || '0'}-${data.team2_wickets || '0'}</div>
-                        <div style="opacity: 0.8;">(${data.team2_overs || '0'} overs)</div>
-                    ` : '<div class="stat-value">Yet to bat</div>'}
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Run Rate</div>
-                    <div class="stat-value">${data.runrate || 'CRR: 0.00'}</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Last Update</div>
-                    <div class="stat-value">${data.timestamp || 'N/A'}</div>
-                </div>
-            `;
-            
-            // Update batsmen data
-            if (data.batterone && data.batterone !== 'Batsman 1') {
-                batsmenData.style.display = 'block';
-                let batsmenHtml = `<p>🏏 ${data.batterone}: ${data.batsmanonerun} ${data.batsmanoneball} SR: ${data.batsmanonesr}</p>`;
-                if (data.battertwo && data.battertwo !== 'Batsman 2') {
-                    batsmenHtml += `<p>🏏 ${data.battertwo}: ${data.batsmantworun} ${data.batsmantwoball} SR: ${data.batsmantwosr}</p>`;
-                }
-                batsmenInfo.innerHTML = batsmenHtml;
-            } else {
-                batsmenData.style.display = 'none';
-            }
-        }
         
         async function setURL(event) {
             event.preventDefault();
@@ -906,16 +705,7 @@ URL_INPUT_PAGE = """
                 if (response.ok) {
                     status.innerHTML = '✅ Tracking started successfully!';
                     status.className = 'status success';
-                    
-                    // Update display immediately
-                    if (data.initial_data) {
-                        updateMatchDisplay(data.initial_data);
-                    }
-                    
-                    // Initialize SSE connection
-                    if (!eventSource) {
-                        initSSE();
-                    }
+                    setTimeout(() => window.location.reload(), 1500);
                 } else {
                     status.innerHTML = '❌ ' + (data.error || 'Failed to set URL');
                     status.className = 'status error';
@@ -938,11 +728,7 @@ URL_INPUT_PAGE = """
                 if (response.ok) {
                     status.innerHTML = '✅ Scores refreshed!';
                     status.className = 'status success';
-                    updateMatchDisplay(data);
-                    setTimeout(() => {
-                        status.innerHTML = '';
-                        status.className = '';
-                    }, 2000);
+                    setTimeout(() => window.location.reload(), 1000);
                 } else {
                     status.innerHTML = '❌ Failed to refresh scores';
                     status.className = 'status error';
@@ -965,21 +751,12 @@ URL_INPUT_PAGE = """
             }
         }
         
-        // Initialize on page load
-        window.addEventListener('load', function() {
-            // Initialize SSE if we have a match URL
-            const matchUrl = document.getElementById('matchUrl').value;
-            if (matchUrl) {
-                initSSE();
-            }
-        });
-        
-        // Clean up on page unload
-        window.addEventListener('beforeunload', function() {
-            if (eventSource) {
-                eventSource.close();
-            }
-        });
+        // Auto-refresh the page every 30 seconds if auto-update is enabled
+        if (autoUpdate) {
+            setInterval(() => {
+                window.location.reload();
+            }, 30000);
+        }
     </script>
 </body>
 </html>
@@ -1046,7 +823,7 @@ def live_scores():
 
 @app.route('/api/set-url', methods=['POST'])
 def set_url():
-    global CURRENT_MATCH_URL, MATCH_DATA, LAST_UPDATE_TIME
+    global CURRENT_MATCH_URL, MATCH_DATA
     
     data = request.json
     url = data.get('url')
@@ -1055,22 +832,18 @@ def set_url():
         return jsonify({"error": "URL is required"}), 400
     
     CURRENT_MATCH_URL = url
-    LAST_UPDATE_TIME = None  # Reset update time
     
     # Do initial scrape
     scraped_data = scraper.scrape_crex_scores(url)
     if scraped_data:
         MATCH_DATA = scraped_data
-        LAST_UPDATE_TIME = datetime.now()
         print_match_update(scraped_data)
-        logger.info(f"Successfully set URL and scraped initial data: {url}")
         return jsonify({
             "message": "URL set successfully", 
             "url": url,
             "initial_data": scraped_data
         })
     
-    logger.error("Failed to scrape initial data after setting URL")
     return jsonify({"error": "Failed to scrape initial data"}), 500
 
 @app.route('/api/current-score')
@@ -1087,23 +860,23 @@ def get_current_score():
     if not CURRENT_MATCH_URL:
         return jsonify({"error": "No match URL set. Please visit the home page to set a URL."}), 400, response_headers
     
-    # Check if we should update data
-    if should_update_data():
-        logger.info("Data is stale, triggering update...")
-        success = update_match_data()
-        if not success and not MATCH_DATA:
-            return jsonify({"error": "Failed to fetch current scores"}), 503, response_headers
-    
-    # Return current data if available
+    # Check if MATCH_DATA has actual data (not just empty dict)
     if MATCH_DATA and any(MATCH_DATA.values()):
         return jsonify(MATCH_DATA), 200, response_headers
     else:
-        return jsonify({"error": "No data available yet. Please wait for the first update."}), 503, response_headers
+        # If no data yet, trigger a scrape
+        print(f"{Colors.CYAN}No data available, triggering scrape...{Colors.ENDC}")
+        data = scraper.scrape_crex_scores(CURRENT_MATCH_URL)
+        if data:
+            MATCH_DATA = data
+            return jsonify(MATCH_DATA), 200, response_headers
+        else:
+            return jsonify({"error": "No data available yet. Please wait for the first update."}), 503, response_headers
 
 @app.route('/api/scrape')
 def scrape_match():
     """Scrape match data from URL parameter or current URL"""
-    global CURRENT_MATCH_URL, MATCH_DATA, LAST_UPDATE_TIME
+    global CURRENT_MATCH_URL, MATCH_DATA
     
     match_url = request.args.get('url') or CURRENT_MATCH_URL
     
@@ -1114,41 +887,30 @@ def scrape_match():
     
     if data:
         MATCH_DATA = data
-        LAST_UPDATE_TIME = datetime.now()
         print_match_update(data)
-        
-        # Notify SSE clients
-        notify_sse_clients(data)
-        
-        logger.info("Successfully scraped match data")
         return jsonify(data)
     
-    logger.error("Failed to scrape match data")
     return jsonify({"error": "Unable to scrape match data"}), 500
 
 @app.route('/api/status')
 def get_status():
-    global CURRENT_MATCH_URL, AUTO_UPDATE, MATCH_DATA, LAST_UPDATE_TIME
+    global CURRENT_MATCH_URL, AUTO_UPDATE, MATCH_DATA
     return jsonify({
         "current_url": CURRENT_MATCH_URL,
         "auto_update": AUTO_UPDATE,
         "update_interval": UPDATE_INTERVAL,
         "has_data": bool(MATCH_DATA),
-        "last_update": LAST_UPDATE_TIME.strftime("%Y-%m-%d %H:%M:%S") if LAST_UPDATE_TIME else None,
-        "active_connections": len(ACTIVE_CONNECTIONS)
+        "last_update": MATCH_DATA.get('timestamp') if MATCH_DATA else None
     })
 
 @app.route('/api/debug')
 def debug_info():
     """Debug endpoint to check current state"""
-    global CURRENT_MATCH_URL, MATCH_DATA, LAST_UPDATE_TIME
+    global CURRENT_MATCH_URL, MATCH_DATA
     return jsonify({
         "current_url": CURRENT_MATCH_URL,
         "has_match_data": bool(MATCH_DATA),
-        "last_update": LAST_UPDATE_TIME.strftime("%Y-%m-%d %H:%M:%S") if LAST_UPDATE_TIME else None,
         "match_data_keys": list(MATCH_DATA.keys()) if MATCH_DATA else [],
-        "should_update": should_update_data(),
-        "active_sse_connections": len(ACTIVE_CONNECTIONS),
         "match_data_sample": {
             "team1_name": MATCH_DATA.get('team1_name', 'N/A'),
             "team1_score": MATCH_DATA.get('team1_score', 'N/A'),
@@ -1168,7 +930,6 @@ def debug_info():
 def toggle_auto_update():
     global AUTO_UPDATE
     AUTO_UPDATE = not AUTO_UPDATE
-    logger.info(f"Auto-update {'enabled' if AUTO_UPDATE else 'disabled'}")
     print(f"\n{Colors.CYAN}Auto-update {'enabled' if AUTO_UPDATE else 'disabled'}{Colors.ENDC}")
     return jsonify({"auto_update": AUTO_UPDATE})
 
@@ -1206,7 +967,6 @@ def test_page():
         <button onclick="testAPI()">Test API</button>
         <button onclick="testDebug()">Debug Info</button>
         <button onclick="testStatus()">API Status</button>
-        <button onclick="testSSE()">Test SSE Connection</button>
         
         <pre id="output">Click a button to test the API</pre>
         
@@ -1251,41 +1011,6 @@ def test_page():
                     output.textContent = `Error: ${error.message}`;
                 }
             }
-            
-            function testSSE() {
-                const output = document.getElementById('output');
-                output.textContent = 'Testing SSE connection...\\n';
-                
-                const eventSource = new EventSource('/events');
-                let messageCount = 0;
-                
-                eventSource.onopen = function() {
-                    output.textContent += 'SSE Connected!\\n';
-                };
-                
-                eventSource.onmessage = function(event) {
-                    messageCount++;
-                    output.textContent += `Message ${messageCount}: ${event.data.substring(0, 100)}...\\n`;
-                    
-                    if (messageCount >= 3) {
-                        eventSource.close();
-                        output.textContent += 'SSE Test completed (received 3 messages)\\n';
-                    }
-                };
-                
-                eventSource.onerror = function() {
-                    output.textContent += 'SSE Error occurred\\n';
-                    eventSource.close();
-                };
-                
-                // Close after 10 seconds if not already closed
-                setTimeout(() => {
-                    if (eventSource.readyState !== EventSource.CLOSED) {
-                        eventSource.close();
-                        output.textContent += 'SSE Test timeout (10s)\\n';
-                    }
-                }, 10000);
-            }
         </script>
     </body>
     </html>
@@ -1300,7 +1025,6 @@ def print_banner():
 ║  {Colors.BOLD}🏏  CRICKET SCORE TRACKER - CREX SCRAPER  🏏{Colors.ENDC}{Colors.CYAN}           ║
 ║                                                           ║
 ║  {Colors.GREEN}Made with ❤️  by Gajju{Colors.CYAN}                                  ║
-║  {Colors.BLUE}Enhanced with Real-time SSE Updates{Colors.CYAN}                     ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝{Colors.ENDC}
     """)
@@ -1336,35 +1060,23 @@ def print_match_update(data):
             print(f"  • {data.get('battertwo')}: {data.get('batsmantworun')} {data.get('batsmantwoball')} SR: {data.get('batsmantwosr')}")
     
     print(f"\n{Colors.BOLD}Time:{Colors.ENDC} {data.get('timestamp', 'N/A')}")
-    print(f"Active SSE connections: {len(ACTIVE_CONNECTIONS)}")
     print(f"{Colors.GREEN}━━━━━━━━━━━━━━━━━━━{Colors.ENDC}\n")
 
 def auto_update_scores():
-    """Background thread to auto-update scores - now works better with deployments"""
-    global CURRENT_MATCH_URL, MATCH_DATA, AUTO_UPDATE, UPDATE_INTERVAL, LAST_UPDATE_TIME
-    
-    logger.info("Auto-update thread started")
+    """Background thread to auto-update scores"""
+    global CURRENT_MATCH_URL, MATCH_DATA, AUTO_UPDATE, UPDATE_INTERVAL
     
     while True:
-        try:
-            time.sleep(UPDATE_INTERVAL)
-            
-            if AUTO_UPDATE and CURRENT_MATCH_URL:
-                logger.info("[Auto-Update] Checking if update needed...")
-                
-                if should_update_data():
-                    logger.info("[Auto-Update] Updating scores...")
-                    success = update_match_data()
-                    
-                    if success:
-                        logger.info("[Auto-Update] Successfully updated scores")
-                    else:
-                        logger.error("[Auto-Update] Failed to update scores")
-                else:
-                    logger.debug("[Auto-Update] Data is still fresh, skipping update")
-        except Exception as e:
-            logger.error(f"[Auto-Update] Error in update loop: {str(e)}")
-            time.sleep(5)  # Wait before retrying
+        time.sleep(UPDATE_INTERVAL)
+        
+        if AUTO_UPDATE and CURRENT_MATCH_URL:
+            print(f"{Colors.CYAN}[Auto-Update] Fetching latest scores...{Colors.ENDC}")
+            data = scraper.scrape_crex_scores(CURRENT_MATCH_URL)
+            if data:
+                MATCH_DATA = data
+                print_match_update(data)
+            else:
+                print(f"{Colors.FAIL}[Auto-Update] Failed to fetch scores{Colors.ENDC}")
 
 def get_user_input():
     """Interactive terminal menu"""
@@ -1393,9 +1105,8 @@ def get_user_input():
             data = scraper.scrape_crex_scores(url)
             if data:
                 MATCH_DATA = data
-                LAST_UPDATE_TIME = datetime.now()
                 print_match_update(data)
-            else:
+        else:
                 print(f"{Colors.FAIL}❌ Failed to fetch initial scores{Colors.ENDC}")
     
     elif choice == '2':
@@ -1408,7 +1119,6 @@ def get_user_input():
         data = scraper.scrape_crex_scores(CURRENT_MATCH_URL)
         if data:
             MATCH_DATA = data
-            LAST_UPDATE_TIME = datetime.now()
             print_match_update(data)
     
     elif choice == '3':
@@ -1440,7 +1150,6 @@ def print_server_info():
     print(f"   • Web Interface: {Colors.CYAN}http://localhost:5000{Colors.ENDC}")
     print(f"   • Live Scores: {Colors.CYAN}http://localhost:5000/live{Colors.ENDC}")
     print(f"   • API Endpoint: {Colors.CYAN}http://localhost:5000/api/current-score{Colors.ENDC}")
-    print(f"   • Real-time Events: {Colors.CYAN}http://localhost:5000/events{Colors.ENDC}")
     print(f"   • Test Page: {Colors.CYAN}http://localhost:5000/test.html{Colors.ENDC}")
     print(f"   • Debug API: {Colors.CYAN}http://localhost:5000/api/debug{Colors.ENDC}")
     print(f"   • Auto-Update: {Colors.GREEN if AUTO_UPDATE else Colors.FAIL}{'Enabled' if AUTO_UPDATE else 'Disabled'}{Colors.ENDC}")
@@ -1451,7 +1160,6 @@ def print_server_info():
     
     print(f"\n{Colors.BOLD}📝 Instructions:{Colors.ENDC}")
     print("   • Visit the web interface to manage settings")
-    print("   • Real-time updates via Server-Sent Events (SSE)")
     print("   • The API will auto-update scores every " + str(UPDATE_INTERVAL) + " seconds")
     print("   • View live scores at /live endpoint")
     print("   • Use /test.html to debug API issues")
@@ -1464,19 +1172,12 @@ if __name__ == '__main__':
         update_thread = threading.Thread(target=auto_update_scores, daemon=True)
         update_thread.start()
         
-        # Get user input if running interactively
-        if os.isatty(sys.stdin.fileno()):
-            get_user_input()
-        else:
-            # Running on server (like Render), just print info
-            print_banner()
-            print_server_info()
+        # Get user input
+        get_user_input()
         
         # Run Flask app with proper host configuration
         port = int(os.environ.get('PORT', 5000))
         host = os.environ.get('HOST', '0.0.0.0')
-        
-        logger.info(f"Starting Flask app on {host}:{port}")
         
         app.run(
             debug=False, 
@@ -1488,5 +1189,4 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print(f"\n\n{Colors.CYAN}Server stopped. Goodbye! 👋{Colors.ENDC}")
         sys.exit(0)
-
 
